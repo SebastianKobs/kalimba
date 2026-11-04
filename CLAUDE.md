@@ -19,6 +19,7 @@ Log entries also carry the date: ``- `pending` 2026-11-04 LABEL: **Decision or c
 | `npm run test:e2e` | Playwright: the sound rendered offline in Firefox, muted, and measured (`test/e2e/`); the phone fit again in WebKit as an iPhone (its system libraries once per machine: `sudo env "PATH=$PATH" ./node_modules/.bin/playwright install-deps webkit`) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run build` | typecheck, then production build into `dist/` |
+| GitHub Pages | every push to `main`: the unit tests, then the page built for `/kalimba/` (`BASE_PATH`, read by `vite.config.ts`) and published (`.github/workflows/pages.yml`; Settings → Pages → Source: GitHub Actions, once) |
 | `npm run image` | build the page into a Docker image and export it to `deploy/kalimba.tar.gz`, to copy to the docker machine over ssh (`deploy/README.md`; `HOST=…` fills in the printed commands) |
 | `npm run update-libs` | copy stim-garden's libraries into `libs/` again (`tools/update-libs.sh`; `COMMIT=…` for another commit) |
 
