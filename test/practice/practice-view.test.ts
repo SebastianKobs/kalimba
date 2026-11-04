@@ -281,6 +281,21 @@ describe('mountPractice', () => {
     expect(playing()).toBe(false);
   });
 
+  it('plays the newly chosen song from its start when the song changes while one runs; stopped, it starts nothing', () => {
+    const { q, set, start, view, targets } = setup();
+    set('mode', 'wait');
+    set('song', '1');
+    expect(targets()).toEqual([]); // nothing running: nothing started
+    set('song', '0');
+    start();
+    view.tick(10);
+    expect(targets()).toEqual(['C4']);
+    set('song', '1');
+    view.tick(10);
+    expect(targets()).toEqual(['G4']);
+    expect(q('[role="status"]').textContent).toMatch(/^Built-in two/);
+  });
+
   describe('the loop', () => {
     it('is a toggle beside the click, labelled Schleife, on to start', () => {
       const { q } = setup();

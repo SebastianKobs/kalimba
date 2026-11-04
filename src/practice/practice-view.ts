@@ -527,10 +527,13 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
 
   const beatsPerMinute = () => Number(tempoInput.value);
 
-  // a retuning belongs to the song it was made for: another song starts on the standard tongues
+  // a retuning belongs to the song it was made for: another song starts on the standard tongues;
+  // one running gives way to the new one, from its start
   songSelect.addEventListener('change', () => {
+    const playing = session !== undefined && !session.finished;
     showSong();
     if (halfSteps.some((h) => h !== 0)) applyTuning(halfSteps.map(() => 0));
+    if (playing) start();
   });
   textArea.addEventListener('input', () => {
     showText();
