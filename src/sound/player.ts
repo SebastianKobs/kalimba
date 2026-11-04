@@ -66,14 +66,10 @@ export class ModularPlayer implements Plucker, ScheduledSound {
     this.#running?.sound.setTongues(tongues);
   }
 
-  /** Starts the audio on a user gesture, so the first pluck sounds at once. */
-  prepare(): void {
-    this.#start();
-  }
-
   #start(): Running {
     if (this.#running) {
-      if (this.#running.context.state === 'suspended') void this.#running.context.resume();
+      // suspended, or on iOS interrupted: asked again, from inside the press that wants it
+      if (this.#running.context.state !== 'running') void this.#running.context.resume();
       return this.#running;
     }
     const context = new AudioContext({ latencyHint: 'interactive' });

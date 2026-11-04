@@ -5,6 +5,7 @@ import { SONGS } from './songs';
 import { KLANG_STORAGE_KEY, parseStoredKlang, type KlangValues } from './sound/klang';
 import { mountKlangPanel } from './sound/klang-panel';
 import { ModularPlayer } from './sound/player';
+import { unlockAudio } from './sound/unlock';
 import { SongPlayer } from './practice/song-player';
 
 function loadKlang(): KlangValues {
@@ -46,10 +47,8 @@ mountKlangPanel(app.querySelector<HTMLElement>('.stage .kalimba')!, {
   },
 });
 
-// audio may only start after a user gesture: started on the first one
-const prepareOnce = () => sound.prepare();
-document.addEventListener('pointerdown', prepareOnce, { once: true });
-document.addEventListener('keydown', prepareOnce, { once: true });
+// audio may only start inside a tap or key the browser accepts (on iOS not pointerdown): started there, tried again until it runs
+unlockAudio(document, () => sound.context());
 
 let last = performance.now();
 const frame = (now: number) => {
