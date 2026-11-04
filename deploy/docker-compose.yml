@@ -1,0 +1,24 @@
+# The kalimba behind Traefik v2, from an image made by `npm run image` rather than a registry. How to deploy it: README.md
+# named, so the project isn't called after the folder it's in (a user's home)
+name: kalimba
+
+services:
+  kalimba:
+    image: kalimba:latest
+    pull_policy: never
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    networks: [traefik]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.http.routers.kalimba.rule=Host(`${KALIMBA_HOST:?set KALIMBA_HOST in .env}`)
+      - traefik.http.routers.kalimba.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.kalimba.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.services.kalimba.loadbalancer.server.port=8080
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}

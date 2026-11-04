@@ -12,11 +12,14 @@ Log entries also carry the date: ``- `pending` 2026-11-04 LABEL: **Decision or c
 
 | Command | What it does |
 |---|---|
+| `just dev` | the same as `npm run dev`: Vite dev server (`just` lists the recipes) |
+| `just deploy` | build the image and deploy it to the docker machine in `deploy/.env`: copied over ssh, loaded and started (`deploy/README.md`) |
 | `npm run dev` | Vite dev server |
 | `npm test` | Vitest: the unit tests, in node and jsdom |
 | `npm run test:e2e` | Playwright: the sound rendered offline in Firefox, muted, and measured (`test/e2e/`) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run build` | typecheck, then production build into `dist/` |
+| `npm run image` | build the page into a Docker image and export it to `deploy/kalimba.tar.gz`, to copy to the docker machine over ssh (`deploy/README.md`; `HOST=…` fills in the printed commands) |
 | `npm run update-libs` | copy stim-garden's libraries into `libs/` again (`tools/update-libs.sh`; `COMMIT=…` for another commit) |
 
 Enable the commit hook once per clone: `git config core.hooksPath .githooks`.

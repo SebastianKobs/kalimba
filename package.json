@@ -9,7 +9,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "update-libs": "sh tools/update-libs.sh",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "image": "tools/build-image.sh"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
