@@ -1,0 +1,4 @@
+#!/bin/sh
+# Fills a labelled commit's hash into its log entries: see rule-based-commit-logging/claude-rule.md, next to this file.
+# Enable once per clone: git config core.hooksPath .githooks
+exec sh "$(dirname "$0")/rule-based-commit-logging/log-commit-hash.sh"

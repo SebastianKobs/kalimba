@@ -1,0 +1,10 @@
+# The commit labels: which log each goes in, and in its comment what it's for.
+# Read by log-commit-hash.sh, and imported into the rule by claude-rule.md.
+# A commit with several labels goes in each of their logs, once per log.
+# Keep it to flat `LABEL: path` lines, with paths from the repo root and no spaces:
+# the script reads it with sed, not a YAML parser.
+
+DESIGN: logs/design-log.md        # how it looks and plays: tongue layout, input (pointer, keyboard), visuals
+SOUND: logs/sound-log.md          # the tine sound: synthesis model, partials, decay, damping, levels
+RULE: logs/rule-log.md            # project rules and conventions (CLAUDE.md, .githooks)
+TECHNICAL: logs/technical-log.md  # tooling, stack, setup and repo housekeeping, and fixes to existing behaviour
