@@ -1,4 +1,4 @@
-import { arrange } from '../../src/music/arrange';
+import { arrange, transposeOptions } from '../../src/music/arrange';
 import { parseSong } from '../../src/music/notation';
 import { KALIMBA_17, KALIMBA_21 } from '../../src/layout';
 
@@ -52,5 +52,36 @@ describe('arrange', () => {
     const a = arrange(parseSong('title: T\ntempo: 60\nC4_ E4 -'), KALIMBA_21);
     expect(a.notes.map((n) => [n.beat, n.beats])).toEqual([[0, 0.5], [0.5, 2]]);
     expect([a.title, a.beatsPerMinute, a.lengthBeats]).toEqual(['T', 60, 2.5]);
+  });
+
+  it('moves a G major tab from a 17-tongue kalimba with raised F down a fifth onto the C 21', () => {
+    // C4–E6 with F#: up a fourth would leave the range, down a fifth lands on F3–A5
+    const a = arrange(parseSong('key: G\n1 4 1″ 3″'), KALIMBA_21);
+    expect(a.transpose).toBe(-7);
+    expect(played(a)).toEqual(['F3', 'B3', 'F5', 'A5']);
+    expect(a.notes.every((n) => n.fit === 'exact')).toBe(true);
+  });
+});
+
+describe('transposeOptions', () => {
+  const summary = (text: string) =>
+    transposeOptions(parseSong(text), KALIMBA_21).map((o) => [o.transpose, o.exact, o.folded, o.skipped]);
+
+  it('offers both ways from G major to C, the best fit first', () => {
+    // down a fifth fits; up a fourth sends E6 over the top tongue; up an octave and a fourth folds 2 of 9
+    expect(summary('key: G\n1 2 3 4 5 6 7 1′ 3″')).toEqual([[-7, 9, 0, 0], [5, 8, 1, 0], [17, 7, 2, 0]]);
+  });
+
+  it('offers octaves of a song that already fits, leaving out those that fold too much', () => {
+    expect(summary('C4 D4 E4 F4 G4 A4 B4 C5')).toEqual([[0, 8, 0, 0], [12, 8, 0, 0]]);
+  });
+
+  it('puts first what arrange picks by itself', () => {
+    const song = parseSong('D4 E4 F#4 G4 A4 B4 C#5 D5');
+    expect(transposeOptions(song, KALIMBA_21)[0].transpose).toBe(arrange(song, KALIMBA_21).transpose);
+  });
+
+  it('offers at most six', () => {
+    expect(transposeOptions(parseSong('C4 E4'), KALIMBA_21).length).toBeLessThanOrEqual(6);
   });
 });

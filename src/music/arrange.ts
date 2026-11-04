@@ -66,9 +66,41 @@ function rank(a: Arrangement): number[] {
 }
 
 function better(a: Arrangement, b: Arrangement): boolean {
+  return compare(a, b) < 0;
+}
+
+export interface TransposeOption {
+  readonly transpose: number;
+  readonly exact: number;
+  /** notes moved by an octave to reach a tongue */
+  readonly folded: number;
+  /** notes no tongue has in any octave */
+  readonly skipped: number;
+}
+
+// beyond this share of notes moved by an octave the melody line breaks up
+const MAX_FOLDED_SHARE = 0.25;
+const MAX_OPTIONS = 6;
+
+function compare(a: Arrangement, b: Arrangement): number {
   const [ra, rb] = [rank(a), rank(b)];
   const i = ra.findIndex((v, k) => v !== rb[k]);
-  return i >= 0 && ra[i] > rb[i];
+  return i < 0 ? 0 : rb[i] - ra[i];
+}
+
+/** The ways to fit a song onto the tongues worth offering a player, best first: none loses more notes than needed, few fold. */
+export function transposeOptions(song: Song, tongues: readonly Tongue[]): TransposeOption[] {
+  const all: Arrangement[] = [];
+  for (let shift = -MAX_SHIFT; shift <= MAX_SHIFT; shift++) all.push(arrangeAt(song, tongues, shift));
+  const fewestSkipped = Math.min(...all.map((a) => a.skipped.length));
+  const total = song.notes.length;
+  return all
+    .filter((a) => a.skipped.length === fewestSkipped)
+    .map((a) => ({ a, folded: a.notes.filter((n) => n.fit === 'octave').length }))
+    .filter(({ a, folded }) => folded <= MAX_FOLDED_SHARE * total && a.notes.length > 0)
+    .sort((x, y) => compare(x.a, y.a))
+    .slice(0, MAX_OPTIONS)
+    .map(({ a, folded }) => ({ transpose: a.transpose, exact: a.notes.length - folded, folded, skipped: a.skipped.length }));
 }
 
 /** Fits any song onto any set of tongues: picks the transposition, folds octaves, skips what can't be played. */

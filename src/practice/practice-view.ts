@@ -1,7 +1,8 @@
 import { mountKalimba, type KalimbaHandle, type Plucker } from '../kalimba-view';
 import type { Tongue } from '../layout';
-import { arrange, type Arrangement } from '../music/arrange';
-import { parseSong, SongTextError } from '../music/notation';
+import { arrange, transposeOptions, type Arrangement, type TransposeOption } from '../music/arrange';
+import { describeShift } from '../music/interval';
+import { DEFAULT_TEMPO, keyOf, parseSong, SongTextError, tempoOf, titleOf, type IgnoredText } from '../music/notation';
 import { PracticeSession, type PracticeMode } from './session';
 
 export interface PracticeSong {
@@ -36,28 +37,51 @@ const MODES: readonly [PracticeMode, string][] = [
 ];
 
 const FORMAT_HELP =
-  "Note names (C4, F#4, Bb3) or kalimba numbers like on the tongues (1 = C4 … 7 = B4, ' an octave up, , an octave down). " +
-  'One beat each: _ halves, . adds half, - holds a beat longer, 0 rests, [1 3 5] is a chord. ' +
-  'Headers: "title: …" and "tempo: 90". | and // comments are ignored.';
+  'Paste a kalimba tab or write your own. Notes: kalimba numbers like on the tongues (1 = C4 … 7 = B4) or letters (C, F#, Bb, or C5 with an octave). ' +
+  "Octave up: ' ′ * ° or a dot above, doubled (or ″ \") for two; octave down: , or a dot below. " +
+  'Played together: ( ) or [ ], e.g. (1 3 5), (135), (5-7), [C E G]. A - after a note holds it a beat longer: 2-4 is 2 for two beats, then 4. ' +
+  'Rhythm: one beat per note at the tempo slider; _ halves, . adds half, 0 rests. ' +
+  'Headers: "title: …", "tempo: 90" (sets the slider) and "key: G" (every F becomes F#, like a kalimba with its F tongue raised; also D, F, Bb, Em …). Anything else, such as lyrics, links or headings, is skipped and listed.';
+
+const MAX_NAME_LENGTH = 80;
+
+// retuned kalimbas tabs are often written for; any other key can be typed as a "key:" line
+const TAB_TUNINGS: readonly [string, string][] = [
+  ['', 'as written (C)'],
+  ['G', 'F raised to F# (G major)'],
+  ['D', 'F and C raised (D major)'],
+  ['F', 'B lowered to Bb (F major)'],
+];
+
+function songOption(song: PracticeSong, index: number): string {
+  return `<option value="${index}">${escapeHtml(song.title)}</option>`;
+}
 
 function controlsMarkup(songs: readonly PracticeSong[]): string {
-  const songOptions = songs.map((s, i) => `<option value="${i}">${escapeHtml(s.title)}</option>`).join('');
+  const songOptions = songs.map(songOption).join('');
   const modeOptions = MODES.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
   return `
     <div class="controls">
       <label>Song <select name="song">${songOptions}</select></label>
       <label>Mode <select name="mode">${modeOptions}</select></label>
-      <label>Speed <input type="range" name="speed" min="25" max="150" step="5" value="100" />
-        <output name="speed-value">100%</output></label>
+      <label>Tempo <input type="range" name="tempo" min="20" max="240" step="1" value="${DEFAULT_TEMPO}" />
+        <output name="tempo-value">${DEFAULT_TEMPO} BPM</output></label>
+      <label>Transpose <select name="transpose"></select></label>
       <button type="button" name="start">Start</button>
       <button type="button" name="stop">Stop</button>
     </div>
-    <details class="song-text">
-      <summary>Song text: edit it or paste your own</summary>
-      <textarea name="text" rows="8" spellcheck="false"></textarea>
-      <p class="help">${FORMAT_HELP}</p>
-    </details>
+    <div class="song-text">
+      <textarea name="text" rows="4" spellcheck="false" aria-label="Song text"
+        placeholder="Paste a kalimba tab here, name it and press Import"></textarea>
+      <div class="import-row">
+        <label>Name <input type="text" name="import-name" maxlength="${MAX_NAME_LENGTH}" placeholder="e.g. Sweden" /></label>
+        <label>Tab tuning <select name="import-key">${TAB_TUNINGS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
+        <button type="button" name="import">Import</button>
+        <details class="help"><summary>Tab format</summary><p>${FORMAT_HELP}</p></details>
+      </div>
+    </div>
     <p class="status" role="status"></p>
+    <p class="skipped"></p>
     <p class="error" role="alert"></p>`;
 }
 
@@ -69,13 +93,34 @@ function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? '' : 's'}`;
 }
 
-function describeFit(a: Arrangement): string {
-  const shift = a.transpose === 0 ? 'as written' : `moved ${a.transpose < 0 ? 'down' : 'up'} ${plural(Math.abs(a.transpose), 'semitone')}`;
+function describeFit(name: string, a: Arrangement): string {
+  const shift = a.transpose === 0 ? 'as written' : `moved ${describeShift(a.transpose)}`;
   const folded = a.notes.filter((n) => n.fit === 'octave').length;
-  const parts = [a.title, shift];
+  const parts = [name, shift];
   if (folded > 0) parts.push(`${plural(folded, 'note')} moved by an octave to fit`);
   if (a.skipped.length > 0) parts.push(`${plural(a.skipped.length, 'note')} left out: no tongue has them`);
   return parts.join(' · ');
+}
+
+function describeOption(option: TransposeOption, best: boolean): string {
+  const parts = [describeShift(option.transpose)];
+  if (option.folded > 0) parts.push(`${plural(option.folded, 'note')} moved by an octave`);
+  if (option.skipped > 0) parts.push(`${plural(option.skipped, 'note')} left out`);
+  if (best) parts.push('best fit');
+  return parts.join(' · ');
+}
+
+const SKIPPED_SHOWN = 6;
+const SKIPPED_TEXT_LENGTH = 40;
+
+function describeIgnored(ignored: readonly IgnoredText[]): string {
+  if (ignored.length === 0) return '';
+  const shorten = (text: string) => (text.length > SKIPPED_TEXT_LENGTH ? `${text.slice(0, SKIPPED_TEXT_LENGTH - 1)}…` : text);
+  const items = ignored
+    .slice(0, SKIPPED_SHOWN)
+    .map((i) => `line ${i.line} "${shorten(i.text)}"${i.reason ? ` (${i.reason})` : ''}`);
+  const more = ignored.length > SKIPPED_SHOWN ? ` and ${ignored.length - SKIPPED_SHOWN} more` : '';
+  return `Skipped what isn't notes: ${items.join(' · ')}${more}`;
 }
 
 function describeScore(session: PracticeSession): string {
@@ -93,20 +138,28 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   panel.innerHTML = controlsMarkup(config.songs);
   const stage = doc.createElement('div');
   stage.className = 'stage';
+  const highwayBox = doc.createElement('div');
+  highwayBox.className = 'highway-box';
   const canvas = doc.createElement('canvas');
   canvas.className = 'highway';
-  stage.append(canvas);
+  highwayBox.append(canvas);
+  stage.append(highwayBox);
   root.append(panel, stage);
 
   const field = <T extends Element>(name: string) => panel.querySelector<T>(`[name="${name}"]`)!;
   const songSelect = field<HTMLSelectElement>('song');
   const modeSelect = field<HTMLSelectElement>('mode');
-  const speedInput = field<HTMLInputElement>('speed');
-  const speedValue = field<HTMLOutputElement>('speed-value');
+  const tempoInput = field<HTMLInputElement>('tempo');
+  const tempoValue = field<HTMLOutputElement>('tempo-value');
   const textArea = field<HTMLTextAreaElement>('text');
   const status = panel.querySelector<HTMLElement>('.status')!;
   const error = panel.querySelector<HTMLElement>('.error')!;
+  const skipped = panel.querySelector<HTMLElement>('.skipped')!;
 
+  const songs: PracticeSong[] = [...config.songs];
+  const nameInput = field<HTMLInputElement>('import-name');
+  const keySelect = field<HTMLSelectElement>('import-key');
+  const transposeSelect = field<HTMLSelectElement>('transpose');
   let session: PracticeSession | undefined;
   let fit = '';
 
@@ -125,16 +178,87 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     if (session) status.textContent = [fit, describeScore(session)].filter(Boolean).join(' — ');
   };
 
+  const setTempo = (bpm: number) => {
+    tempoInput.value = String(bpm);
+    tempoValue.textContent = `${tempoInput.value} BPM`;
+  };
+
+  const selectedSong = () => songs[Number(songSelect.value)];
+
+  // offered afresh whenever the text changes; the player's pick is used at Start
+  const offerTranspositions = () => {
+    let options: TransposeOption[] = [];
+    try {
+      options = transposeOptions(parseSong(textArea.value), config.tongues);
+    } catch (e) {
+      if (!(e instanceof SongTextError)) throw e;
+    }
+    transposeSelect.innerHTML = options
+      .map((o, i) => `<option value="${o.transpose}">${escapeHtml(describeOption(o, i === 0))}</option>`)
+      .join('');
+    transposeSelect.disabled = options.length === 0;
+  };
+
   const showSong = () => {
-    textArea.value = config.songs[Number(songSelect.value)]?.text ?? '';
+    textArea.value = selectedSong()?.text ?? '';
+    setTempo(tempoOf(textArea.value) ?? DEFAULT_TEMPO);
+    offerTranspositions();
+  };
+
+  // pasted tabs rarely name a tempo: then the slider keeps its setting
+  const takeTempoFromText = () => {
+    const tempo = tempoOf(textArea.value);
+    if (tempo !== undefined) setTempo(tempo);
+  };
+
+  const clearMessages = () => {
+    error.textContent = '';
+    skipped.textContent = '';
+  };
+
+  const importSong = () => {
+    clearMessages();
+    const title = nameInput.value.trim();
+    if (!title) {
+      error.textContent = 'Give the song a name to import it.';
+      return;
+    }
+    if (songs.some((song) => song.title === title)) {
+      error.textContent = `A song named "${title}" is already in the list: pick another name.`;
+      return;
+    }
+    // the tuning goes into the text as a key line, so it stays visible and editable
+    const text = keySelect.value && !keyOf(textArea.value) ? `key: ${keySelect.value}\n${textArea.value}` : textArea.value;
+    try {
+      const parsed = parseSong(text);
+      songs.push({ title, text });
+      textArea.value = text;
+      keySelect.value = '';
+      offerTranspositions();
+      songSelect.insertAdjacentHTML('beforeend', songOption(songs.at(-1)!, songs.length - 1));
+      songSelect.value = String(songs.length - 1);
+      nameInput.value = '';
+      stop();
+      takeTempoFromText();
+      skipped.textContent = describeIgnored(parsed.ignored);
+      const ignoredPart = parsed.ignored.length > 0 ? `, ${plural(parsed.ignored.length, 'part')} skipped` : '';
+      status.textContent = `Added "${title}": ${plural(parsed.notes.length, 'note')}${ignoredPart}. Press Start to play it.`;
+    } catch (e) {
+      if (!(e instanceof SongTextError)) throw e;
+      error.textContent = e.message;
+    }
   };
 
   const start = () => {
-    error.textContent = '';
+    clearMessages();
     try {
-      const arrangement = arrange(parseSong(textArea.value), config.tongues);
+      const song = parseSong(textArea.value);
+      skipped.textContent = describeIgnored(song.ignored);
+      const transpose = transposeSelect.value === '' ? undefined : Number(transposeSelect.value);
+      const arrangement = arrange(song, config.tongues, { transpose });
       session = new PracticeSession(arrangement, modeSelect.value as PracticeMode);
-      fit = describeFit(arrangement);
+      // a title line in the text wins: it may be a built-in edited into something else
+      fit = describeFit(titleOf(textArea.value) ?? selectedSong()?.title ?? song.title, arrangement);
       refresh();
     } catch (e) {
       if (!(e instanceof SongTextError)) throw e;
@@ -148,18 +272,26 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     kalimba.setTargets([]);
   };
 
-  const speed = () => Number(speedInput.value) / 100;
+  const beatsPerMinute = () => Number(tempoInput.value);
 
   songSelect.addEventListener('change', showSong);
-  speedInput.addEventListener('input', () => (speedValue.textContent = `${speedInput.value}%`));
+  textArea.addEventListener('input', () => {
+    takeTempoFromText();
+    offerTranspositions();
+  });
+  tempoInput.addEventListener('input', () => setTempo(beatsPerMinute()));
   field<HTMLButtonElement>('start').addEventListener('click', start);
   field<HTMLButtonElement>('stop').addEventListener('click', stop);
+  field<HTMLButtonElement>('import').addEventListener('click', importSong);
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') importSong();
+  });
   showSong();
 
   return {
     tick(seconds) {
       if (session && !session.finished) {
-        const beats = (seconds * session.arrangement.beatsPerMinute * speed()) / 60;
+        const beats = (seconds * beatsPerMinute()) / 60;
         session.advance(beats).forEach((note) => kalimba.pluck(note.tongue));
         refresh();
       }

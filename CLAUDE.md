@@ -35,14 +35,16 @@ Core logic is pure and tested in Node. Edges are thin.
 |---|---|
 | `src/pitch.ts` | note name (with # or b) → MIDI number → frequency (12-TET, A4 = 440 Hz) |
 | `src/layout.ts` | `createTongues`, `KALIMBA_21` (the card), `KALIMBA_17`: tongues with cipher digit, octave dots and length (L ∝ 1/√f) |
-| `src/music/notation.ts` | `parseSong`: song text (note names or kalimba numbers, jianpu durations) → notes in beats; `SongTextError` for bad input |
-| `src/music/arrange.ts` | `arrange`: any song onto any tongues: best transposition, octave folding, skipped notes |
+| `src/music/notation.ts` | `parseSong`: song text or pasted kalimba tab (letters or numbers; `'` `′` `*` `°` `″` `”` dot above/below as octave marks; `( )`/`[ ]` group notes played together, a `-` after a note holds it a beat longer, also glued: `2-4`; jianpu durations) → notes in beats; skips and lists what it can't read (lines mostly not notes are skipped whole); `SongTextError` only when no notes are left; `tempoOf`, `titleOf` |
+| `src/music/key.ts` | `keySignature`: key name (G, Bb major, Em) → which letters are raised or lowered; `key:` lines in song text |
+| `src/music/arrange.ts` | `arrange`: any song onto any tongues: best transposition, octave folding, skipped notes; `transposeOptions`: the shifts worth offering, best first |
+| `src/music/interval.ts` | `describeShift`: semitones → "down a fifth (7 semitones)" |
 | `src/practice/session.ts` | `PracticeSession`: clock and scoring in beats for listen, play-along and wait modes |
 | `src/synth.ts` | `renderTine`: frequency → mono samples (decaying sine modes, 2nd mode at 6.267×) |
 | `src/keymap.ts` | `KeyboardEvent.code` → tongue, in pitch order: `Z`…`/` then `A`…`'` |
 | `src/kalimba-view.ts` | edge: draws the tongues, maps pointer and keyboard input to `Plucker.pluck` |
 | `src/audio.ts` | edge: `WebAudioPlucker`, one voice per tongue, damps on re-pluck, limiter on the master |
-| `src/practice/practice-view.ts` | edge: song, mode and speed controls, status and errors, kalimba with targets |
+| `src/practice/practice-view.ts` | edge: song, mode, tempo (BPM) and transpose controls; song box with name, tab tuning (writes a `key:` line) + Import (adds to the song list, this session only); status, skipped text, errors; kalimba with targets |
 | `src/practice/highway.ts` | edge: canvas lane per tongue, notes falling onto the bridge |
 | `src/songs/index.ts` | built-in songs, public domain only |
 | `src/main.ts` | wires practice view, audio and the animation frame loop |
