@@ -122,6 +122,16 @@ function formatHelpMarkup(): string {
     </dialog>`;
 }
 
+// the transport as symbols, drawn in the text's colour; each named for a screen reader where it's used
+const ICONS = {
+  start: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M8 5.5v13l10.5-6.5z" /></svg>',
+  stop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect class="fill" x="6.5" y="6.5" width="11" height="11" rx="1.5" /></svg>',
+  // a metronome: its body, the pendulum leaning
+  click: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5h6l3.5 17h-13z M12 16.5l4-9.5 M8 16.5h8" /></svg>',
+  // round and back again
+  loop: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3.5l3 3-3 3 M20 6.5H8a4 4 0 0 0-4 4v1 M7 20.5l-3-3 3-3 M4 17.5h12a4 4 0 0 0 4-4v-1" /></svg>',
+};
+
 const MAX_NAME_LENGTH = 80;
 const METERS = ['2/4', '3/4', '4/4', '5/4', '6/8', '12/8'];
 const DEFAULT_METER = '4/4';
@@ -149,10 +159,11 @@ function controlsMarkup(songs: readonly PracticeSong[]): string {
       <label class="field tempo">Tempo <span><input type="range" name="tempo" min="20" max="240" step="1" value="${DEFAULT_TEMPO}" />
         <output name="tempo-value">${DEFAULT_TEMPO} BPM</output></span></label>
       <label class="field meter">Takt <select name="meter">${METERS.map((m) => `<option value="${m}">${m}</option>`).join('')}</select></label>
-      <label class="click-toggle"><input type="checkbox" name="click" /> Klick</label>
       <div class="actions">
-        <button type="button" name="stop">Stopp</button>
-        <button type="button" name="start">Start</button>
+        <label class="icon-toggle" title="Klick"><input type="checkbox" name="click" />${ICONS.click}<span class="visually-hidden">Klick</span></label>
+        <label class="icon-toggle" title="Schleife"><input type="checkbox" name="loop" checked />${ICONS.loop}<span class="visually-hidden">Schleife</span></label>
+        <button type="button" name="stop" aria-label="Stopp" title="Stopp">${ICONS.stop}</button>
+        <button type="button" name="start" aria-label="Start" title="Start">${ICONS.start}</button>
       </div>
     </div>
     <div class="song-strip">
@@ -265,6 +276,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const tempoValue = field<HTMLOutputElement>('tempo-value');
   const meterSelect = field<HTMLSelectElement>('meter');
   const clickBox = field<HTMLInputElement>('click');
+  const loopBox = field<HTMLInputElement>('loop');
   const textArea = field<HTMLTextAreaElement>('text');
   const error = panel.querySelector<HTMLElement>('.error:not(.editor-error)')!;
   const editorError = panel.querySelector<HTMLElement>('.editor-error')!;
@@ -291,6 +303,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
         config.sound.pluck(tongue);
         if (!session || session.finished) return;
         if (session.pluck(tongue) === 'miss') kalimba.markMiss(tongue);
+        if (session.finished) loopOrEnd(session); // waiting or playing along, the last note played ends it
         refresh();
       },
     },
@@ -431,8 +444,10 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
       skipped.textContent = describeIgnored(song.ignored);
       const transpose = transposeSelect.value === '' ? undefined : Number(transposeSelect.value);
       const arrangement = arrange(song, tongues, { transpose });
-      session = new PracticeSession(arrangement, modeSelect.value as PracticeMode, { beatsPerBar: beatsPerBar() });
-      playOnClock(session);
+      // a bar counted in only with the click to count it; without, the song starts on the next beat
+      const leadInBeats = clickBox.checked ? beatsPerBar() : 0;
+      session = new PracticeSession(arrangement, modeSelect.value as PracticeMode, { beatsPerBar: beatsPerBar(), leadInBeats });
+      playOnClock(session, leadInBeats);
       tabMarks = renderTabView(tabView, textArea.value, arrangement.notes);
       // a title line in the text wins: it may be a built-in edited into something else
       fit = describeFit(titleOf(textArea.value) ?? selectedSong()?.title ?? song.title, arrangement);
@@ -445,16 +460,29 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   };
 
   // listening or playing along, the song player keeps the time and the click, and plays the notes when listening
-  const playOnClock = (running: PracticeSession) => {
+  const playOnClock = (running: PracticeSession, leadInBeats: number) => {
     config.songPlayer?.stop();
     if (running.mode === 'wait') return;
     config.songPlayer?.play({
       notes: running.mode === 'listen' ? running.arrangement.notes : [],
       bpm: beatsPerMinute(),
       meter: meter(),
-      leadInBeats: beatsPerBar(),
+      leadInBeats,
       click: clickBox.checked,
     });
+  };
+
+  const loopOrEnd = (done: PracticeSession) => {
+    if (loopBox.checked) playAgain(done);
+    else config.songPlayer?.stop();
+  };
+
+  // the song again from the next bar line, so the loop keeps the beat; waiting, at once
+  const playAgain = (done: PracticeSession) => {
+    const toBarLine = done.mode === 'wait' ? 0 : Math.ceil(done.beat / done.beatsPerBar - 1e-9) * done.beatsPerBar - done.beat;
+    session = new PracticeSession(done.arrangement, done.mode, { beatsPerBar: done.beatsPerBar, leadInBeats: toBarLine });
+    playOnClock(session, toBarLine);
+    highlight([]);
   };
 
   const stop = () => {
@@ -523,7 +551,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
           session.advance(beats).forEach((note) => kalimba.pluck(note.tongue));
           if (clickBox.checked) clicksBetween(from, session.beat, session.beatsPerBar).forEach((c) => config.metronome?.click(c.accent));
         }
-        if (session.finished) config.songPlayer?.stop();
+        if (session.finished) loopOrEnd(session);
         refresh();
       }
       highway.draw(session);

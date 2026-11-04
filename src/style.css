@@ -121,7 +121,7 @@ kbd {
   border-radius: 8px;
 }
 .field select, .field input[type="text"] { height: 40px; padding: 0 12px; }
-.field select:focus-visible, .field input:focus-visible, .song-editor textarea:focus-visible, button:focus-visible, .click-toggle:focus-within {
+.field select:focus-visible, .field input:focus-visible, .song-editor textarea:focus-visible, button:focus-visible, .icon-toggle:has(input:focus-visible) {
   outline: 2px solid var(--accent-soft);
   outline-offset: 2px;
 }
@@ -139,8 +139,7 @@ button { font: inherit; cursor: pointer; }
   font-weight: 600;
 }
 .controls button:hover, .song-strip button:hover, .import-row button:hover { border-color: var(--accent-soft); }
-.controls button[name="start"] { height: 44px; padding: 0 30px; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; box-shadow: 0 4px 14px var(--glow); }
-.controls button[name="stop"] { height: 44px; }
+.controls button[name="start"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 4px 14px var(--glow); }
 
 /* playing: one row on a laptop, song to Start; it wraps on narrower screens */
 .controls { display: flex; flex-wrap: wrap; gap: 12px 12px; align-items: flex-end; }
@@ -152,9 +151,16 @@ button { font: inherit; cursor: pointer; }
 .controls .tempo input { flex: 1; min-width: 0; width: 100%; } /* a range has a wide default: held to its field */
 .controls .meter { flex: 0 0 80px; }
 .controls output { color: var(--text); font-size: 0.95rem; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; min-width: 4.5em; }
-.controls .click-toggle { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--text); font-size: 0.95rem; cursor: pointer; }
-.controls .click-toggle input { width: 18px; height: 18px; margin: 0; }
-.controls .actions { display: flex; gap: 10px; margin-left: auto; }
+/* the transport: click and loop toggles, stop and start, as square symbols */
+.controls .actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.controls .actions button, .icon-toggle { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 10px; }
+.icon-toggle { position: relative; border: 1px solid var(--line); background: var(--field); color: var(--text); cursor: pointer; }
+.icon-toggle:hover { border-color: var(--accent-soft); }
+/* the checkbox kept, for the keyboard and a screen reader; the symbol shows its state */
+.icon-toggle input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.icon-toggle:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.controls .actions svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.controls .actions svg .fill { fill: currentColor; stroke: none; }
 
 /* the song text on a strip of two lines: as written, or while it plays with the played part marked, its line on top */
 .song-editor textarea, .tab-view { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.875rem; line-height: 1.6; }

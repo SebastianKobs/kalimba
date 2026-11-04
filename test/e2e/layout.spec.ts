@@ -9,7 +9,7 @@ test('the page fits a phone: nothing scrolls sideways, not even the longest tran
 test('on a laptop screen the controls are one row, and the kalimba fits under them without scrolling', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/');
-  const controls = ['.field.song', '.field.mode', '.field.transpose', '.field.tempo', '.field.meter', '.click-toggle', '[name="start"]'];
+  const controls = ['.field.song', '.field.mode', '.field.transpose', '.field.tempo', '.field.meter', '.icon-toggle', '[name="start"]'];
   const middles = await page.locator(controls.join(', ')).evaluateAll((all) => all.map((c) => Math.round(c.getBoundingClientRect().bottom / 20)));
   expect(new Set(middles).size).toBe(1); // their bottoms line up
   const kalimbaBottom = await page.locator('.kalimba').evaluate((k) => k.getBoundingClientRect().bottom);

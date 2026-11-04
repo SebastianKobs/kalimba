@@ -82,9 +82,15 @@ describe('mountPractice', () => {
     const { q } = setup();
     const texts = (selector: string) => [...q(`${selector}`).querySelectorAll('option')].map((o) => o.text);
     expect(texts('[name="mode"]')).toEqual(['Anhören: die Kalimba spielt', 'Mitspielen: im Takt', 'Warten: Schritt für Schritt']);
-    expect(['start', 'stop', 'import', 'edit-text'].map((name) => q(`[name="${name}"]`).textContent)).toEqual([
-      'Start', 'Stopp', 'Importieren', 'Liedtext bearbeiten',
+    expect(['import', 'edit-text'].map((name) => q(`[name="${name}"]`).textContent)).toEqual(['Importieren', 'Liedtext bearbeiten']);
+    // symbols, named for a screen reader and as a tooltip
+    expect(['start', 'stop'].map((name) => [q(`[name="${name}"]`).getAttribute('aria-label'), q<HTMLElement>(`[name="${name}"]`).title])).toEqual([
+      ['Start', 'Start'], ['Stopp', 'Stopp'],
     ]);
+    expect(['click', 'loop'].map((name) => [q(`[name="${name}"]`).closest('label')!.textContent!.trim(), q(`[name="${name}"]`).closest('label')!.title])).toEqual([
+      ['Klick', 'Klick'], ['Schleife', 'Schleife'],
+    ]);
+    expect(['start', 'stop', 'click', 'loop'].every((name) => q(`[name="${name}"]`).closest('label, button')!.querySelector('svg'))).toBe(true);
     expect(q('.tuning-reset').getAttribute('aria-label')).toBe('Stimmung zurücksetzen');
     expect(q('.tuning').textContent).toBe('Stimmung: Standard-C');
   });
@@ -151,8 +157,8 @@ describe('mountPractice', () => {
     set('text', 'C4 E4');
     set('tempo', '30');
     start();
-    // 30 BPM: half a beat per second; 4 beats lead-in
-    view.tick(8);
+    // 30 BPM: half a beat per second; no click, no lead-in
+    view.tick(1);
     expect(sounded).toEqual(['C4']);
     view.tick(2);
     expect(sounded).toEqual(['C4', 'E4']);
@@ -226,12 +232,13 @@ describe('mountPractice', () => {
       expect(meter(q)).toBe('7/4');
     });
 
-    it('counts in one bar of the chosen meter', () => {
-      const { set, start, view, sounded } = setup();
+    it('counts in one bar of the chosen meter, with the click on', () => {
+      const { set, start, check, view, sounded } = setup();
       set('mode', 'listen');
       set('text', 'C4');
       set('meter', '3/4');
       set('tempo', '60');
+      check('click', true);
       start();
       view.tick(2.9);
       expect(sounded).toEqual([]);
@@ -258,6 +265,37 @@ describe('mountPractice', () => {
       start();
       view.tick(5);
       expect(clicks).toEqual([]);
+    });
+  });
+
+  describe('the loop', () => {
+    it('is a toggle beside the click, labelled Schleife, on to start', () => {
+      const { q } = setup();
+      const loop = q<HTMLInputElement>('[name="loop"]');
+      expect(loop.checked).toBe(true);
+      expect(loop.closest('label')!.textContent!.trim()).toBe('Schleife');
+    });
+
+    it('waiting, starts the song again once its last note is played', () => {
+      const { set, start, check, view, press, targets } = setup();
+      set('mode', 'wait');
+      set('text', 'C4 E4');
+      check('loop', true);
+      start();
+      view.tick(0.1);
+      press('C4');
+      press('E4');
+      view.tick(0.1);
+      expect(targets()).toEqual(['C4']);
+    });
+
+    it('waiting, without the click, shows the first note at once: no bar to wait through', () => {
+      const { set, start, view, targets } = setup();
+      set('mode', 'wait');
+      set('text', 'C4');
+      start();
+      view.tick(0.01);
+      expect(targets()).toEqual(['C4']);
     });
   });
 
@@ -328,16 +366,17 @@ describe('mountPractice', () => {
       set('text', 'C4 E4');
       set('tempo', '60');
       start();
-      view.tick(4);
+      view.tick(0.5);
       expect(now(q)).toEqual(['C4']);
       view.tick(1);
       expect(now(q)).toEqual(['E4']);
     });
 
     it('drops the highlight when stopped or done', () => {
-      const { q, set, start, view, press } = setup();
+      const { q, set, start, check, view, press } = setup();
       set('mode', 'wait');
       set('text', 'C4');
+      check('loop', false); // done, not again
       start();
       view.tick(10);
       q<HTMLButtonElement>('[name="stop"]').click();
@@ -369,15 +408,50 @@ describe('mountPractice', () => {
     };
     const notesOf = (start: SongStart) => start.notes.map((n) => `${n.tongue.note}@${n.beat}`);
 
-    it('listening, hands it the song at Start: its notes, the tempo, the meter, a bar’s lead-in and the click', () => {
-      const { set, start, asked } = withPlayer();
+    it('listening, hands it the song at Start: its notes, the tempo, the meter, and with the click a bar’s lead-in', () => {
+      const { set, start, check, asked } = withPlayer();
       set('mode', 'listen');
       set('text', 'meter: 3/4\nC4 E4');
       set('tempo', '72');
+      check('click', true);
       start();
       expect(asked.played).toHaveLength(1);
       expect(notesOf(asked.played[0]!)).toEqual(['C4@0', 'E4@1']);
-      expect(asked.played[0]).toMatchObject({ bpm: 72, meter: { beatsPerBar: 3, beatUnit: 4 }, leadInBeats: 3, click: false });
+      expect(asked.played[0]).toMatchObject({ bpm: 72, meter: { beatsPerBar: 3, beatUnit: 4 }, leadInBeats: 3, click: true });
+    });
+
+    it('counts nothing in without the click: the song starts on the next beat', () => {
+      const { set, start, asked } = withPlayer();
+      set('mode', 'listen');
+      set('text', 'C4 E4');
+      start();
+      expect(asked.played[0]).toMatchObject({ leadInBeats: 0, click: false });
+    });
+
+    it('loops when asked: at the song’s end it starts again on the next bar line, no count-in between', () => {
+      const { set, start, check, view, asked, moveTo, q } = withPlayer();
+      set('mode', 'listen');
+      set('text', 'C4 E4 G4'); // three beats: the bar ends a beat after
+      check('click', true);
+      check('loop', true);
+      start();
+      moveTo(3.2);
+      view.tick(0.016);
+      expect(asked.played).toHaveLength(2);
+      expect(asked.played[1]!.leadInBeats).toBeCloseTo(0.8, 6); // to beat 4, the next bar line
+      expect(q('[role="status"]').textContent).not.toMatch(/Fertig/);
+    });
+
+    it('stops at the song’s end without the loop', () => {
+      const { set, start, check, view, asked, moveTo } = withPlayer();
+      set('mode', 'listen');
+      set('text', 'C4 E4');
+      check('loop', false);
+      start();
+      moveTo(2.2);
+      view.tick(0.016);
+      expect(asked.played).toHaveLength(1);
+      expect(asked.stops).toBeGreaterThan(0);
     });
 
     it('listening, leaves the plucking to it and follows its beat, however long the frames: the text marks what it plays', () => {
@@ -397,9 +471,10 @@ describe('mountPractice', () => {
     });
 
     it('playing along, keeps the time and the click for the player, and plays none of the notes', () => {
-      const { set, start, view, q, asked, moveTo, press, sounded } = withPlayer();
+      const { set, start, check, view, q, asked, moveTo, press, sounded } = withPlayer();
       set('mode', 'play-along');
       set('text', 'C4 E4');
+      check('loop', false); // to its end, once
       start();
       expect(asked.played[0]!.notes).toEqual([]);
       moveTo(0);
