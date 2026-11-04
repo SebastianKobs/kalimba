@@ -11,7 +11,7 @@ describe('the Klang macros', () => {
 
   it('at their defaults, sound like the voice card as written', () => {
     expect(preset({})).toMatchObject({
-      '2nd/level': 0.08, '3rd/level': 0.025, 'ping/level': 0.2, 'ting/level': 0.08,
+      '2nd/level': 0.001, '3rd/level': 0.0001, 'ping/level': 0.08, 'ting/level': 0.006,
       'knock/level': 0.08, 'twin/level': 0.12, 'twin/tune': 0.03, 'click/level': 0.25, 'click env/decay': 0.02,
     });
     expect(preset({})['tone/cutoff']).toBeCloseTo(3500, -1); // within 5 Hz
@@ -21,7 +21,7 @@ describe('the Klang macros', () => {
 
   it('Obertöne scales the harmonics and the ping modes together: 0 pure, 2 twice as metallic', () => {
     expect(preset({ obertoene: 0 })).toMatchObject({ '2nd/level': 0, '3rd/level': 0, 'ping/level': 0, 'ting/level': 0 });
-    expect(preset({ obertoene: 2 })['ping/level']).toBeCloseTo(0.4, 6);
+    expect(preset({ obertoene: 2 })['ping/level']).toBeCloseTo(0.16, 6);
   });
 
   it('Helligkeit closes a lowpass from 20 kHz down to 300 Hz, evenly by octaves', () => {

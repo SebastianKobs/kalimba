@@ -52,8 +52,8 @@ Core logic is pure and tested in Node. Edges are thin.
 | `src/music/interval.ts` | `describeShift`: semitones → "down a fifth (7 semitones)" |
 | `src/practice/metronome.ts` | `clicksBetween`: the beats the clock passed, first of each bar accented |
 | `src/practice/session.ts` | `PracticeSession`: clock and scoring in beats for listen, play-along and wait modes; `currentNotes` for highlighting the text |
-| `src/sound/kalimba.yaml` | the voice cards as a file of instruments: the tine (its modes at 1, 1.0017 (a twin detuned by its tune), 2, 3, 6.267 and 17.547 times the note, a noise click, a 240 Hz box knock, each group through a VCA its envelope opens, all but the click through a lowpass at 3500 Hz) and the metronome click; patches `kalimba` and `click` |
-| `src/sound/kalimba-card.ts` | the file read (`KALIMBA`); `decayTimeFor`: a note's decay time by its pitch, ~2.5 s to −60 dB at C4 |
+| `src/sound/kalimba.yaml` | the voice cards as a file of instruments: the tine (its modes at 1, 1.0017 (a twin detuned by its tune), 2, 3, 6.5 and 17.3 times the note, levels as measured on a Thomann Sun Kalimba's sound demo, a noise click, a 240 Hz box knock, each group through a VCA its envelope opens, all but the click through a lowpass at 3500 Hz) and the metronome click; patches `kalimba` and `click` |
+| `src/sound/kalimba-card.ts` | the file read (`KALIMBA`); `decayTimeFor`: a note's decay time by its pitch, ~4.2 s to −60 dB at C4 (as the demo rings) |
 | `src/sound/plucks.ts` | `Plucks`: a pluck as MIDI 2.0 messages (note on, decay time, note off once rung; a ringing tongue's earlier note let go: damped), shaped by Stimmung and Nachklang; `clickMessages` |
 | `src/sound/instruments.ts` | edge: the kalimba's and click's `Instrument`s built in a context, for the player and the offline render alike |
 | `src/sound/klang.ts` | the Klang panel's macros (Obertöne, Helligkeit from 3500 Hz, Anschlag, Körper, Schwebung, Stimmung, Nachklang): `presetFor` maps them onto the voice card's values (read from `kalimba.yaml`), `pitchOffset` and `ringFactor` onto each pluck; stored in the browser (`parseStoredKlang`) |
@@ -66,7 +66,7 @@ Core logic is pure and tested in Node. Edges are thin.
 | `src/songs/index.ts` | built-in songs, public domain only |
 | `src/main.ts` | wires practice view, audio and the animation frame loop; loads and saves the tuning in localStorage |
 
-Tests live in `test/`. The view tests run in jsdom with a fake plucker and no highway. The sound is tested end to end in `test/e2e/`: `render.html` renders plucks offline through the same instruments as the player, `sound.spec.ts` measures pitch, ring, click, shimmer, harmonics, knock, damping, each Klang macro's effect and the metronome; `klang.spec.ts` opens the panel and moves a slider. `player.ts`, `highway.ts` and drag-to-strum have no automated tests; they are checked by playing.
+Tests live in `test/`. The view tests run in jsdom with a fake plucker and no highway. The sound is tested end to end in `test/e2e/`: `render.html` renders plucks offline through the same instruments as the player, `sound.spec.ts` measures pitch, ring and timbre against the demo's numbers (ring time, harmonics, the 6.5× ping), click, shimmer, harmonics, knock, damping, each Klang macro's effect and the metronome; `klang.spec.ts` opens the panel and moves a slider. `player.ts`, `highway.ts` and drag-to-strum have no automated tests; they are checked by playing.
 
 ## Songs
 

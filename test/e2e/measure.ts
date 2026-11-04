@@ -36,16 +36,22 @@ export function estimateFrequency(samples: readonly number[], expected: number):
   return SAMPLE_RATE / (bestLag + (0.5 * (l - r)) / (l - 2 * c + r));
 }
 
-/** Amplitude of one frequency in a window: a single-bin DFT. */
+/**
+ * Amplitude of one frequency in a window: a single-bin DFT, Hann-windowed. Unwindowed, a strong decaying note leaks
+ * about −44 dB into its own harmonics, as loud as a real tine's harmonics are.
+ */
 export function amplitudeAt(samples: readonly number[], frequency: number, from: number, to: number): number {
   const [start, end] = [at(from), at(to)];
-  let [re, im] = [0, 0];
+  const n = end - start;
+  let [re, im, weights] = [0, 0, 0];
   for (let i = start; i < end; i++) {
+    const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * (i - start)) / (n - 1));
     const phase = (2 * Math.PI * frequency * i) / SAMPLE_RATE;
-    re += samples[i]! * Math.cos(phase);
-    im -= samples[i]! * Math.sin(phase);
+    re += w * samples[i]! * Math.cos(phase);
+    im -= w * samples[i]! * Math.sin(phase);
+    weights += w;
   }
-  return (2 * Math.hypot(re, im)) / (end - start);
+  return (2 * Math.hypot(re, im)) / weights;
 }
 
 export const db = (ratio: number) => 20 * Math.log10(ratio);

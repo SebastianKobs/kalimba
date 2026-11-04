@@ -21,10 +21,11 @@ test('a tine sounds at its note', async ({ page }) => {
   }
 });
 
-test('it rings about 2.5 s at C4, still singing at 0.5 s, nearly gone at 2.5 s', async ({ page }) => {
-  const samples = await pluck(page, 'C4', 3);
-  expect(levelDb(samples, 0.5)).toBeGreaterThan(-20);
-  expect(levelDb(samples, 2.5)).toBeLessThan(-45);
+// the reference: a Thomann Sun Kalimba's sound demo, measured; its tines ring 2.3 to 4.8 s to −60 dB, G5 down to B3
+test('it rings like a real tine: about 4 s to −60 dB at C4, still singing at 1.5 s, nearly gone at 4 s', async ({ page }) => {
+  const samples = await pluck(page, 'C4', 4.5);
+  expect(levelDb(samples, 1.5)).toBeGreaterThan(-25);
+  expect(levelDb(samples, 4)).toBeLessThan(-50);
 });
 
 test('low tines ring longer than high ones', async ({ page }) => {
@@ -42,15 +43,22 @@ test('it shimmers: its level wobbles around the fade, from its twin a hair above
   expect(spreadAroundFade(await pluck(page, 'E6', 1.2), 0.1, 1)).toBeGreaterThan(0.4);
 });
 
-test('weak 2nd and 3rd harmonics ring after the attack, so the octave is easy to hear', async ({ page }) => {
+test('it’s nearly a pure tone after the attack, as a real tine: a 2nd harmonic around −55 dB, the 3rd far below', async ({ page }) => {
   const f = 261.63;
   const samples = await pluck(page, 'C4', 0.5);
   const fundamental = amplitudeAt(samples, f, 0.2, 0.4);
   const [second, third] = [2, 3].map((n) => db(amplitudeAt(samples, n * f, 0.2, 0.4) / fundamental));
-  expect(second).toBeGreaterThan(-28);
-  expect(second).toBeLessThan(-14);
-  expect(third).toBeGreaterThan(-40);
+  expect(second).toBeLessThan(-50); // the demo: −51 to −68 dB, the 3rd −81 to −93 dB
+  expect(second).toBeGreaterThan(-70);
   expect(third).toBeLessThan(second!);
+});
+
+test('its metallic ping sits at 6.5× the note, 15 to 35 dB under it in the attack, as the demo’s', async ({ page }) => {
+  const f = 261.63;
+  const samples = await pluck(page, 'C4', 0.1);
+  const ping = db(amplitudeAt(samples, 6.5 * f, 0.005, 0.05) / amplitudeAt(samples, f, 0.005, 0.05));
+  expect(ping).toBeLessThan(-15);
+  expect(ping).toBeGreaterThan(-35);
 });
 
 test('the box knocks briefly at 240 Hz', async ({ page }) => {
@@ -97,13 +105,13 @@ test.describe('the Klang panel’s macros, as heard', () => {
     expect(spreadAroundFade(await pluck(page, 'E6', 1.2, { klang: { schwebung: 0 } }), 0.1, 1)).toBeLessThan(0.1);
   });
 
-  test('Helligkeit down: the overtones go dark against the note', async ({ page }) => {
+  test('Helligkeit down: the metallic ping goes dark against the note', async ({ page }) => {
     const f = 261.63;
-    const third = async (helligkeit: number) => {
-      const samples = await pluck(page, 'C4', 0.5, { klang: { helligkeit } });
-      return db(amplitudeAt(samples, 3 * f, 0.2, 0.4) / amplitudeAt(samples, f, 0.2, 0.4));
+    const ping = async (helligkeit: number) => {
+      const samples = await pluck(page, 'C4', 0.1, { klang: { helligkeit } });
+      return db(amplitudeAt(samples, 6.5 * f, 0.005, 0.05) / amplitudeAt(samples, f, 0.005, 0.05));
     };
-    expect((await third(1)) - (await third(0))).toBeGreaterThan(10);
+    expect((await ping(1)) - (await ping(0))).toBeGreaterThan(10);
   });
 
   test('Stimmung +50 Cent: every note a quarter tone higher', async ({ page }) => {
@@ -120,7 +128,7 @@ test.describe('the Klang panel’s macros, as heard', () => {
 
   test('Obertöne off: the metallic ping goes', async ({ page }) => {
     const ping = async (obertoene: number) =>
-      amplitudeAt(await pluck(page, 'C4', 0.1, { klang: { obertoene } }), 6.267 * 261.63, 0.005, 0.05);
+      amplitudeAt(await pluck(page, 'C4', 0.1, { klang: { obertoene } }), 6.5 * 261.63, 0.005, 0.05);
     expect(db((await ping(0)) / (await ping(1)))).toBeLessThan(-20);
   });
 

@@ -8,9 +8,10 @@ export const KALIMBA_PATCH = 'kalimba';
 export const CLICK_PATCH = 'click';
 export const TINE_CARD = 'Kalimba tine';
 
-// a tine rings about 2.5 s to −60 dB at C4, longer the lower it is (√ of the frequency ratio), held in a range
-const RING_AT_C4 = 2.5;
-const RING_RANGE = [0.8, 3.5] as const;
+// a tine rings about 4.2 s to −60 dB at C4, longer the lower it is (√ of the frequency ratio), held in a range:
+// as a Thomann Sun Kalimba's sound demo measures, 2.3 to 4.8 s from G5 down to B3
+const RING_AT_C4 = 4.2;
+const RING_RANGE = [1, 6] as const;
 // the envelope's decay ends 80 dB down (libs/modular-audio/plan/blocks: DONE), the ring is measured to 60 dB
 const SIXTY_TO_EIGHTY = Math.log(1e4) / Math.log(1e3);
 

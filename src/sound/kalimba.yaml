@@ -7,13 +7,17 @@ instruments:
     children:
       # the tine's modes, each at its ratio to the note (the frequency macro's factors below): the note; a
       # twin a hair above, which beats with it, a slow shimmer; weak 2nd and 3rd harmonics, so the octave is
-      # easy to hear; the cantilever's 2nd and 3rd bending modes, inharmonic: the metallic ping
+      # easy to hear; the cantilever's 2nd and 3rd bending modes, inharmonic: the metallic ping (at 6.5× and
+      # 17.3×, as the demo has them; a free cantilever's would be 6.27× and 17.55×)
       - { name: tine, kind: VCO, role: source, values: { level: 0.45 } }
       - { name: twin, kind: VCO, role: source, values: { level: 0.12, tune: 0.03 } }
-      - { name: 2nd, kind: VCO, role: source, values: { level: 0.08 } }
-      - { name: 3rd, kind: VCO, role: source, values: { level: 0.025 } }
-      - { name: ping, kind: VCO, role: source, values: { level: 0.2 } }
-      - { name: ting, kind: VCO, role: source, values: { level: 0.08 } }
+      # levels as a Thomann Sun Kalimba's sound demo measures (Hann-windowed): the 2nd harmonic around −55 dB,
+      # the 3rd far below, nearly a pure tone; the 6.5× mode about 28 dB under the note in the attack, the
+      # 17.3× one about 70 dB
+      - { name: 2nd, kind: VCO, role: source, values: { level: 0.001 } }
+      - { name: 3rd, kind: VCO, role: source, values: { level: 0.0001 } }
+      - { name: ping, kind: VCO, role: source, values: { level: 0.08 } }
+      - { name: ting, kind: VCO, role: source, values: { level: 0.006 } }
       # the thumb releasing the tine: bright noise, its buffer's offset drawn per voice, so no two plucks
       # click alike
       - name: click
@@ -95,8 +99,8 @@ instruments:
           - { to: [twin, frequency], factor: 1, offset: 0 }
           - { to: [2nd, frequency], factor: 2, offset: 0 }
           - { to: [3rd, frequency], factor: 3, offset: 0 }
-          - { to: [ping, frequency], factor: 6.267, offset: 0 }
-          - { to: [ting, frequency], factor: 17.547, offset: 0 }
+          - { to: [ping, frequency], factor: 6.5, offset: 0 }
+          - { to: [ting, frequency], factor: 17.3, offset: 0 }
       - name: gate
         maps:
           - { to: [ring env, gate], factor: 1, offset: 0 }

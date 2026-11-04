@@ -15,7 +15,8 @@ describe('the kalimba voice card', () => {
 
   it('rings at a tine’s modes: the note, a twin a hair above, weak harmonics, the beam’s bending modes', () => {
     const ratios = ['tine', 'twin', '2nd', '3rd', 'ping', 'ting'].map(ratio);
-    const expected = [1, 1.0017, 2, 3, 6.267, 17.547];
+    // the bending modes as a Thomann Sun Kalimba's demo has them (6.5×, 17.3×)
+    const expected = [1, 1.0017, 2, 3, 6.5, 17.3];
     ratios.forEach((r, i) => expect(r).toBeCloseTo(expected[i]!, 4));
   });
 
@@ -51,17 +52,18 @@ describe('the metronome click', () => {
 });
 
 describe('decayTimeFor', () => {
-  // the envelope's decay ends 80 dB down; a tine's ring is measured to 60 dB: 2.5 s at C4
+  // the envelope's decay ends 80 dB down; a tine's ring is measured to 60 dB
   const toEighty = Math.log(1e4) / Math.log(1e3);
 
-  it('rings 2.5 s to −60 dB at C4, longer below, shorter above', () => {
-    expect(decayTimeFor(261.63)).toBeCloseTo(2.5 * toEighty, 2);
+  // as a Thomann Sun Kalimba's demo rings: 2.3 to 4.8 s from G5 down to B3
+  it('rings 4.2 s to −60 dB at C4, longer below, shorter above', () => {
+    expect(decayTimeFor(261.63)).toBeCloseTo(4.2 * toEighty, 2);
     expect(decayTimeFor(174.61)).toBeGreaterThan(decayTimeFor(261.63));
     expect(decayTimeFor(1318.51)).toBeLessThan(decayTimeFor(261.63));
   });
 
-  it('stays between 0.8 s and 3.5 s to −60 dB at the extremes', () => {
-    expect(decayTimeFor(20)).toBeCloseTo(3.5 * toEighty, 2);
-    expect(decayTimeFor(10000)).toBeCloseTo(0.8 * toEighty, 2);
+  it('stays between 1 s and 6 s to −60 dB at the extremes', () => {
+    expect(decayTimeFor(20)).toBeCloseTo(6 * toEighty, 2);
+    expect(decayTimeFor(10000)).toBeCloseTo(1 * toEighty, 2);
   });
 });
