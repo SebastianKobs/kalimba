@@ -28,9 +28,11 @@ export interface KalimbaOptions {
 
 
 
+// what a German (QWERTZ) keyboard prints on the key at each position; the keys play by position
+const GERMAN_KEY_LABELS: Record<string, string> = { KeyZ: 'Y', Comma: ',', Period: '.', Slash: '-', Semicolon: 'Ö', Quote: 'Ä' };
+
 function keyLabel(code: string): string {
-  const symbols: Record<string, string> = { Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: "'" };
-  return symbols[code] ?? code.replace('Key', '');
+  return GERMAN_KEY_LABELS[code] ?? code.replace('Key', '');
 }
 
 function labelTongue(el: HTMLElement, tongue: Tongue): void {

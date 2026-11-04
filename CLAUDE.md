@@ -44,7 +44,7 @@ Core logic is pure and tested in Node. Edges are thin.
 | `src/practice/metronome.ts` | `clicksBetween`: the beats the clock passed, first of each bar accented |
 | `src/practice/session.ts` | `PracticeSession`: clock and scoring in beats for listen, play-along and wait modes; `currentNotes` for highlighting the text |
 | `src/synth.ts` | `renderTine`: frequency → mono samples: noise click and 240 Hz body knock at the attack, decaying sine modes (fundamental, weak 2nd/3rd harmonics, bending modes at 6.267× and 17.547×), ~2.5 s to −60 dB at C4 |
-| `src/keymap.ts` | `KeyboardEvent.code` → tongue place, in the standard tuning's pitch order: `Z`…`/` then `A`…`'`; retuning never moves a key |
+| `src/keymap.ts` | `KeyboardEvent.code` → tongue place, in the standard tuning's pitch order: bottom letter row then home row (QWERTZ `Y`…`-`, `A`…`Ä`); retuning never moves a key |
 | `src/kalimba-view.ts` | edge: draws the tongues, maps pointer and keyboard input to `Plucker.pluck`; relabels retuned tongues; retune mode turns taps into `onRetune` |
 | `src/audio.ts` | edge: `WebAudioPlucker`, one voice per tongue, damps on re-pluck, limiter on the master |
 | `src/practice/practice-view.ts` | edge: song, mode, tempo (BPM), Takt (meter, 4/4 default; `meter:` line sets it), Klick and transpose controls; Retune toggle (tap cycles ♮ → ♯ → ♭), Reset tuning, tuning summary; while a song runs a read-only tab view replaces the song box and highlights the part being played; song box with name, tab tuning (writes a `key:` line) + Import (adds to the song list, this session only); status, skipped text, errors; kalimba with targets |

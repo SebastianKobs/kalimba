@@ -33,6 +33,12 @@ describe('mountKalimba', () => {
     expect(tongues[10].querySelector('.letter')?.textContent).toBe('F\u0323');
   });
 
+  it('labels each tongue with its key as printed on a German keyboard', () => {
+    const { tongue } = setup();
+    const key = (note: string) => tongue(note).querySelector('.key')?.textContent;
+    expect(['F3', 'C4', 'F4', 'A4', 'B4', 'D6', 'E6'].map(key)).toEqual(['Y', 'B', ',', '-', 'A', 'Ö', 'Ä']);
+  });
+
   it('plucks a tongue when it is pressed', () => {
     const { plucked, tongue } = setup();
     tongue('F3').dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
