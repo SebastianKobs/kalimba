@@ -1,13 +1,34 @@
 // @vitest-environment jsdom
 import { KALIMBA_21, type Tongue } from '../../src/layout';
-import { mountPractice } from '../../src/practice/practice-view';
+import { mountPractice, type SongClock } from '../../src/practice/practice-view';
+import type { SongStart } from '../../src/practice/song-player';
 
 const SONGS = [
   { title: 'Built-in one', text: 'title: Built-in one\ntempo: 60\nC4 E4' },
   { title: 'Built-in two', text: 'title: Built-in two\nG4' },
 ];
 
-function setup(tuning?: number[]) {
+// a song player in place of the clock and the clip player: what it's asked, and the beat it says the song is at
+function fakeSongPlayer() {
+  const asked = { played: [] as SongStart[], stops: 0, tempos: [] as number[], clicks: [] as boolean[] };
+  let at: number | undefined;
+  const player: SongClock = {
+    play: (start) => {
+      asked.played.push(start);
+      at = -start.leadInBeats;
+    },
+    stop: () => {
+      asked.stops++;
+      at = undefined;
+    },
+    beat: () => at,
+    setTempo: (bpm) => asked.tempos.push(bpm),
+    setClick: (on) => asked.clicks.push(on),
+  };
+  return { player, asked, moveTo: (beat: number) => (at = beat) };
+}
+
+function setup(tuning?: number[], songPlayer?: SongClock) {
   const root = document.createElement('div');
   document.body.append(root);
   const sounded: string[] = [];
@@ -22,6 +43,7 @@ function setup(tuning?: number[]) {
     tuning,
     onTuningChange: (halfSteps) => savedTunings.push([...halfSteps]),
     metronome: { click: (accent: boolean) => clicks.push(accent) },
+    songPlayer,
   });
   const q = <T extends Element>(selector: string) => root.querySelector<T>(selector)!;
   const set = (name: string, value: string) => {
@@ -260,6 +282,105 @@ describe('mountPractice', () => {
       press('C4');
       view.tick(0.1);
       expect(editing(q)).toBe(true);
+    });
+  });
+
+  describe('on the song player’s clock', () => {
+    const withPlayer = () => {
+      const fake = fakeSongPlayer();
+      return { ...setup(undefined, fake.player), ...fake };
+    };
+    const notesOf = (start: SongStart) => start.notes.map((n) => `${n.tongue.note}@${n.beat}`);
+
+    it('listening, hands it the song at Start: its notes, the tempo, the meter, a bar’s lead-in and the click', () => {
+      const { set, start, asked } = withPlayer();
+      set('mode', 'listen');
+      set('text', 'meter: 3/4\nC4 E4');
+      set('tempo', '72');
+      start();
+      expect(asked.played).toHaveLength(1);
+      expect(notesOf(asked.played[0]!)).toEqual(['C4@0', 'E4@1']);
+      expect(asked.played[0]).toMatchObject({ bpm: 72, meter: { beatsPerBar: 3, beatUnit: 4 }, leadInBeats: 3, click: false });
+    });
+
+    it('listening, leaves the plucking to it and follows its beat, however long the frames: the text marks what it plays', () => {
+      const { set, start, view, sounded, q, moveTo } = withPlayer();
+      set('mode', 'listen');
+      set('text', 'C4 E4');
+      start();
+      view.tick(10);
+      expect(sounded).toEqual([]); // nothing played from the frame: the song player plays
+      moveTo(0.5);
+      view.tick(0.016);
+      expect([...q('.tab-view').querySelectorAll('.now')].map((el) => el.textContent)).toEqual(['C4']);
+      moveTo(1.2);
+      view.tick(0.016);
+      expect([...q('.tab-view').querySelectorAll('.now')].map((el) => el.textContent)).toEqual(['E4']);
+      expect(sounded).toEqual([]);
+    });
+
+    it('playing along, keeps the time and the click for the player, and plays none of the notes', () => {
+      const { set, start, view, q, asked, moveTo, press, sounded } = withPlayer();
+      set('mode', 'play-along');
+      set('text', 'C4 E4');
+      start();
+      expect(asked.played[0]!.notes).toEqual([]);
+      moveTo(0);
+      view.tick(0.016);
+      press('C4');
+      expect(sounded).toEqual(['C4']); // the player's own pluck, heard
+      moveTo(3);
+      view.tick(0.016);
+      expect(q('.status').textContent).toMatch(/1 von 2 gespielt · 1 Fehler/);
+    });
+
+    it('waiting, keeps its own time: the song player isn’t asked', () => {
+      const { set, start, asked } = withPlayer();
+      set('mode', 'wait');
+      set('text', 'C4');
+      start();
+      expect(asked.played).toEqual([]);
+    });
+
+    it('is stopped by Stopp, and before a song starts again', () => {
+      const { set, start, q, asked } = withPlayer();
+      set('mode', 'listen');
+      set('text', 'C4');
+      start();
+      start();
+      q<HTMLButtonElement>('[name="stop"]').click();
+      expect(asked.stops).toBeGreaterThanOrEqual(2);
+      expect(asked.played).toHaveLength(2);
+    });
+
+    it('follows the tempo slider and Klick as they change', () => {
+      const { set, check, asked } = withPlayer();
+      set('tempo', '120');
+      check('click', true);
+      expect(asked.tempos.at(-1)).toBe(120);
+      expect(asked.clicks.at(-1)).toBe(true);
+    });
+
+    it('stops it once the song is done, so its click doesn’t run on', () => {
+      const { set, start, view, asked, moveTo } = withPlayer();
+      set('mode', 'play-along');
+      set('text', 'C4 E4');
+      start();
+      const stopsAtStart = asked.stops;
+      moveTo(10);
+      view.tick(0.016);
+      expect(asked.stops).toBe(stopsAtStart + 1);
+    });
+
+    it('clicks no beats from the frame: the song player clicks them', () => {
+      const { set, check, start, view, clicks, moveTo } = withPlayer();
+      set('mode', 'listen');
+      set('text', 'C4 E4 G4 C5');
+      check('click', true);
+      start();
+      moveTo(2);
+      view.tick(1);
+      expect(clicks).toEqual([]);
     });
   });
 

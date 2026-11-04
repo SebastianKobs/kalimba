@@ -6,6 +6,7 @@ import { SONGS } from './songs';
 import { KLANG_STORAGE_KEY, parseStoredKlang, type KlangValues } from './sound/klang';
 import { mountKlangPanel } from './sound/klang-panel';
 import { ModularPlayer } from './sound/player';
+import { SongPlayer } from './practice/song-player';
 import { parseStoredTuning, TUNING_STORAGE_KEY } from './stored-tuning';
 
 // storage may be blocked (private window, previews): the kalimba then starts in standard tuning
@@ -55,6 +56,8 @@ const practice = mountPractice(app, {
     sound.setTongues(retune(KALIMBA_21, halfSteps));
   },
   metronome: sound,
+  // listening and playing along: the song on the clock, as stim-garden's clip player plays a clip, its notes and clicks ahead of time
+  songPlayer: new SongPlayer(sound),
 });
 // a drawer hidden in the kalimba: its sound as a few macros, heard as they move, kept in the browser
 mountKlangPanel(app.querySelector<HTMLElement>('.stage')!, {

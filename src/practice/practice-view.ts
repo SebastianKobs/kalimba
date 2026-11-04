@@ -6,6 +6,7 @@ import { describeShift } from '../music/interval';
 import { DEFAULT_TEMPO, keyOf, meterOf, parseSong, SongTextError, tempoOf, titleOf, type IgnoredText, type Meter } from '../music/notation';
 import { clicksBetween } from './metronome';
 import { PracticeSession, type PracticeMode } from './session';
+import type { SongStart } from './song-player';
 
 export interface PracticeSong {
   readonly title: string;
@@ -29,6 +30,18 @@ export interface PracticeConfig {
   onTuningChange?(halfSteps: readonly number[]): void;
   /** plays the click; the first beat of a bar is accented */
   readonly metronome?: { click(accent: boolean): void };
+  /** listening and playing along: the song, its time and its click on the clock, ahead of time; none: the frames keep time */
+  readonly songPlayer?: SongClock;
+}
+
+/** Plays a song on the clock (song-player.ts): its notes ahead of time, the click on its beats, where it is in its beats. */
+export interface SongClock {
+  play(start: SongStart): void;
+  stop(): void;
+  /** none when no song plays */
+  beat(): number | undefined;
+  setTempo(bpm: number): void;
+  setClick(on: boolean): void;
 }
 
 export interface PracticeView {
@@ -284,7 +297,11 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     if (![...meterSelect.options].some((o) => o.value === value)) meterSelect.add(new Option(value, value));
     meterSelect.value = value;
   };
-  const beatsPerBar = () => Number(meterSelect.value.split('/')[0]);
+  const meter = (): Meter => {
+    const [beatsPerBar, beatUnit] = meterSelect.value.split('/').map(Number);
+    return { beatsPerBar: beatsPerBar!, beatUnit: beatUnit! };
+  };
+  const beatsPerBar = () => meter().beatsPerBar;
 
   const showSong = () => {
     textArea.value = selectedSong()?.text ?? '';
@@ -347,6 +364,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
       const transpose = transposeSelect.value === '' ? undefined : Number(transposeSelect.value);
       const arrangement = arrange(song, tongues, { transpose });
       session = new PracticeSession(arrangement, modeSelect.value as PracticeMode, { beatsPerBar: beatsPerBar() });
+      playOnClock(session);
       tabMarks = renderTabView(tabView, textArea.value, arrangement.notes);
       // a title line in the text wins: it may be a built-in edited into something else
       fit = describeFit(titleOf(textArea.value) ?? selectedSong()?.title ?? song.title, arrangement);
@@ -358,7 +376,21 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     }
   };
 
+  // listening or playing along, the song player keeps the time and the click, and plays the notes when listening
+  const playOnClock = (running: PracticeSession) => {
+    config.songPlayer?.stop();
+    if (running.mode === 'wait') return;
+    config.songPlayer?.play({
+      notes: running.mode === 'listen' ? running.arrangement.notes : [],
+      bpm: beatsPerMinute(),
+      meter: meter(),
+      leadInBeats: beatsPerBar(),
+      click: clickBox.checked,
+    });
+  };
+
   const stop = () => {
+    config.songPlayer?.stop();
     session = undefined;
     kalimba.setTargets([]);
     showText(true);
@@ -371,7 +403,11 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     takeHeadersFromText();
     offerTranspositions();
   });
-  tempoInput.addEventListener('input', () => setTempo(beatsPerMinute()));
+  tempoInput.addEventListener('input', () => {
+    setTempo(beatsPerMinute());
+    config.songPlayer?.setTempo(beatsPerMinute());
+  });
+  clickBox.addEventListener('change', () => config.songPlayer?.setClick(clickBox.checked));
   field<HTMLButtonElement>('start').addEventListener('click', start);
   field<HTMLButtonElement>('stop').addEventListener('click', stop);
   field<HTMLButtonElement>('import').addEventListener('click', importSong);
@@ -411,10 +447,16 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   return {
     tick(seconds) {
       if (session && !session.finished) {
-        const beats = (seconds * beatsPerMinute()) / 60;
-        const from = session.beat;
-        session.advance(beats).forEach((note) => kalimba.pluck(note.tongue));
-        if (clickBox.checked) clicksBetween(from, session.beat, session.beatsPerBar).forEach((c) => config.metronome?.click(c.accent));
+        const clocked = session.mode === 'wait' ? undefined : config.songPlayer?.beat();
+        if (clocked !== undefined) {
+          session.advance(Math.max(0, clocked - session.beat)); // the song player plays the notes and the click
+        } else {
+          const beats = (seconds * beatsPerMinute()) / 60;
+          const from = session.beat;
+          session.advance(beats).forEach((note) => kalimba.pluck(note.tongue));
+          if (clickBox.checked) clicksBetween(from, session.beat, session.beatsPerBar).forEach((c) => config.metronome?.click(c.accent));
+        }
+        if (session.finished) config.songPlayer?.stop();
         refresh();
       }
       highway.draw(session);

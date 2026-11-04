@@ -1,5 +1,6 @@
 import type { Plucker } from '../kalimba-view';
 import type { Tongue } from '../layout';
+import type { ScheduledSound } from '../practice/song-player';
 import type { KlangValues } from './klang';
 import { KalimbaSound } from './kalimba-sound';
 
@@ -12,8 +13,11 @@ interface Running {
   readonly sound: KalimbaSound;
 }
 
-/** Edge: plays the kalimba live: the audio context started on a gesture, a master level into a limiter. */
-export class ModularPlayer implements Plucker {
+/**
+ * Edge: plays the kalimba live: the audio context started on a gesture, a master level into a limiter. A pluck by hand sounds at once;
+ * a song's notes and clicks come with their own times, ahead, on the audio's clock (the song player's).
+ */
+export class ModularPlayer implements Plucker, ScheduledSound {
   #klang: KlangValues;
   #tongues: readonly Tongue[];
   #running?: Running;
@@ -33,6 +37,21 @@ export class ModularPlayer implements Plucker {
   click(accent: boolean): void {
     const { context, sound } = this.#start();
     sound.click(accent, context.currentTime);
+  }
+
+  /** The audio context, started if it isn't: the clock a song plays on follows it. */
+  context(): AudioContext {
+    return this.#start().context;
+  }
+
+  /** A song's note at its time on the audio's clock. */
+  pluckAt(tongue: Tongue, t: number, velocity: number): void {
+    this.#start().sound.pluck(tongue, t, velocity);
+  }
+
+  /** A song's click at its time on the audio's clock. */
+  clickAt(accent: boolean, t: number): void {
+    this.#start().sound.click(accent, t);
   }
 
   /** The Klang panel's macros changed: heard at once on what rings, from the next pluck on the rest. */
