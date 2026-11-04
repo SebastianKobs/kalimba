@@ -1,4 +1,3 @@
-import './style.css';
 import { KALIMBA_21, retune } from './layout';
 import { canvasHighway } from './practice/highway';
 import { mountPractice } from './practice/practice-view';
@@ -59,8 +58,8 @@ const practice = mountPractice(app, {
   // listening and playing along: the song on the clock, as stim-garden's clip player plays a clip, its notes and clicks ahead of time
   songPlayer: new SongPlayer(sound),
 });
-// a drawer hidden in the kalimba: its sound as a few macros, heard as they move, kept in the browser
-mountKlangPanel(app.querySelector<HTMLElement>('.stage')!, {
+// the kalimba's body a bonnet over its sound: a few macros, heard as they move, kept in the browser
+mountKlangPanel(app.querySelector<HTMLElement>('.stage .kalimba')!, {
   values: klang,
   onChange: (values) => {
     sound.setKlang(values);

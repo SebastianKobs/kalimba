@@ -1,105 +1,101 @@
-/* The Klang panel as a drawer built into the kalimba: shut, it lies behind the body with only its pull under the belly;
-   pulled, its front slides out from under the belly and the sliders out behind it. */
-.kalimba { z-index: 1; } /* the body over the drawer it hides */
-
-.klang-drawer {
-  --drawer-time: 0.45s;
-  --drawer-ease: cubic-bezier(0.3, 0.7, 0.2, 1); /* quick off the mark, settling as a drawer on its runners */
-  --front-height: 46px;
-  --front-curve: 36px; /* its bottom bowed as the belly is, so no corner shows under it */
-  --tuck: 10px;        /* shut, its lowest point this far inside the belly */
+/* The Klang panel under the kalimba's body, which is a bonnet hinged at its top edge:
+   shut, only its brass latch on the belly shows; pulled, the body lifts up and back, its inside showing, the sliders where it lay. */
+.klang-bay {
+  --lift-time: 0.7s;
+  --lift-ease: cubic-bezier(0.3, 0.7, 0.2, 1); /* a quick lift, settling on its stay */
+  --lift: 100deg; /* open: just past upright, leaning back a little */
   position: relative;
-  z-index: 0;
-  align-self: center;
-  width: 70%; /* where the belly is deep enough to hide it */
-  margin-top: calc(-1 * (var(--front-height) + var(--tuck)));
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  max-width: 100%;
+  perspective: 1600px;
+  perspective-origin: 50% 0;
+}
+/* the bonnet and what lies under it share one place */
+.klang-bay > * { grid-area: 1 / 1; }
+/* a phone's bay is nearly the screen's width: a flatter view, so the lid coming up toward the eye stays within it */
+@media (max-width: 700px) { .klang-bay { perspective: 5200px; } }
+
+.bonnet {
+  position: relative;
+  z-index: 1;
+  align-self: start;
+  transform-origin: 50% 0; /* its hinge: the top edge, behind the bridge */
+  transform-style: preserve-3d;
+  transition: transform var(--lift-time) var(--lift-ease);
+}
+.klang-bay.open .bonnet { transform: rotateX(var(--lift)); }
+.bonnet-front, .bonnet-front *, .bonnet-front .kalimba::before { backface-visibility: hidden; }
+.bonnet-front { position: relative; }
+/* and gone once past upright: Firefox shows a transformed child's back (the latch) through a hidden parent */
+.klang-bay.open .bonnet-front { visibility: hidden; transition: visibility 0s linear calc(var(--lift-time) * 0.35); }
+
+/* its inside: bare wood, seen once it's lifted past upright; a click shuts it */
+.bonnet-underside {
+  position: absolute;
+  inset: 0;
+  transform: rotateX(180deg);
+  backface-visibility: hidden;
+  border-radius: 48% 48% 18px 18px / 27% 27% 18px 18px; /* the body's outline, upside down as it is seen */
+  background:
+    url('../wood-grain.svg') 0 0 / 100% 100% no-repeat,
+    var(--grain-lines),
+    linear-gradient(0deg, var(--wood-inside-top), var(--wood-inside-bottom));
+  background-blend-mode: multiply, normal, normal;
+  box-shadow: inset 0 0 24px #0008;
+  cursor: pointer;
 }
 
-/* the opening: a grid row from 0fr to 1fr animates to the sliders' own height, whatever it is;
-   shut, hidden once it has slid in, so its sliders aren't seen or reached */
-.klang-tray {
-  display: grid;
-  grid-template-rows: 0fr;
-  margin: 0 10px; /* the drawer's box, a little inside its front */
+/* brass plates with their names: the latch, and under the bonnet the reset and the close */
+.bonnet-latch, .klang-actions button {
+  height: 22px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(180deg, var(--brass-light), var(--brass) 55%, var(--brass-dark));
+  box-shadow: inset 0 1px 0 #fff6, 0 2px 4px #0008;
+  color: #2a1c0a;
+  font: 600 10px/22px system-ui, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.bonnet-latch:hover, .klang-actions button:hover { filter: brightness(1.08); }
+.bonnet-latch:focus-visible, .klang-actions button:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+/* the latch on the belly, well clear of the longest tongue's tip */
+.bonnet-latch { position: absolute; z-index: 2; left: 50%; bottom: 10px; transform: translateX(-50%); }
+
+/* under it: the body's hollow, the sliders in it; shut, out of the layout so it never sizes the bay;
+   open, in it, so on a phone the bay grows to fit the sliders */
+.klang-cavity {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
   visibility: hidden;
-  transition: grid-template-rows var(--drawer-time) var(--drawer-ease), visibility 0s linear var(--drawer-time);
-}
-.klang-drawer.open .klang-tray {
-  grid-template-rows: 1fr;
-  visibility: visible;
-  transition: grid-template-rows var(--drawer-time) var(--drawer-ease), visibility 0s;
-}
-/* the sliders kept at their bottom edge, so they move out with the front instead of being uncovered in place */
-.klang-slide { min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
-
-.klang {
-  flex: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); /* one column when the drawer is narrower */
-  gap: 8px 24px;
-  /* its back stays inside the body, as deep as the front was tucked */
-  padding: calc(var(--front-height) + var(--tuck) + 14px) 16px 12px;
+  border-radius: 18px 18px 48% 48% / 18px 18px 27% 27%;
   background:
     url('../wood-grain.svg') 0 0 / 100% 100% no-repeat,
     var(--grain-lines),
     linear-gradient(180deg, var(--wood-inside-top), var(--wood-inside-bottom));
   background-blend-mode: multiply, normal, normal;
-  box-shadow: inset 1px 0 0 #0005, inset -1px 0 0 #0005;
+  box-shadow: inset 0 6px 22px #000c, inset 0 0 0 1px #0006;
+  transition: visibility 0s linear var(--lift-time); /* seen until the bonnet is down again */
+}
+.klang-bay.open .klang-cavity { position: relative; visibility: visible; transition: none; }
+
+.klang {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); /* one column on a phone */
+  align-content: center;
+  gap: 8px 24px;
+  min-height: 100%;
+  padding: 24px clamp(14px, 4vw, 40px) 56px;
   text-align: left;
 }
 .klang label { display: grid; grid-template-columns: 6.5em minmax(3em, 1fr) 4.5em; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--wood-label); }
 .klang input[type="range"] { accent-color: var(--accent); width: 100%; }
 .klang output { color: var(--wood-value); text-align: right; font-variant-numeric: tabular-nums; }
-.klang button[name="klang-reset"] {
-  justify-self: start;
-  font: inherit;
-  font-size: 0.85rem;
-  color: var(--wood-value);
-  background: transparent;
-  border: 1px solid var(--wood-label);
-  border-radius: 8px;
-  padding: 6px 14px;
-  cursor: pointer;
-}
-
-/* the front: a piece of the body's wood, bowed as its belly, its pull hanging under it */
-.drawer-front {
-  position: relative;
-  height: var(--front-height);
-  padding: 0;
-  border: none;
-  border-radius: 0 0 50% 50% / 0 0 var(--front-curve) var(--front-curve);
-  background:
-    url('../wood-grain.svg') 0 0 / 100% 100% no-repeat,
-    var(--grain-lines),
-    linear-gradient(180deg, var(--wood-light), var(--wood-dark));
-  background-blend-mode: multiply, normal, normal;
-  box-shadow: 0 8px 18px #000a, inset 0 1px 0 var(--wood-edge);
-  cursor: pointer;
-}
-/* the pull: what shows of the drawer shut, a brass lip with its name */
-.drawer-pull {
-  position: absolute;
-  left: 50%;
-  top: calc(100% - 2px);
-  transform: translateX(-50%);
-  width: 92px;
-  height: 28px;
-  padding-top: 11px;
-  border-radius: 0 0 12px 12px;
-  background: linear-gradient(90deg, var(--brass-dark), var(--brass-light) 45%, var(--brass-dark));
-  box-shadow: 0 3px 5px #0007;
-  color: #2a1c0a;
-  font: 600 10px/1 system-ui, sans-serif;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-.drawer-front:hover .drawer-pull { filter: brightness(1.08); }
-.drawer-front:focus-visible { outline: none; }
-.drawer-front:focus-visible .drawer-pull { outline: 2px solid var(--accent-soft); outline-offset: 2px; } /* the front may be hidden: its pull shows the focus */
+.klang-actions { grid-column: 1 / -1; display: flex; gap: 12px; justify-content: center; margin-top: 8px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .klang-tray, .klang-drawer.open .klang-tray { transition: none; }
+  .klang-bay .bonnet, .klang-bay .klang-cavity, .klang-bay .bonnet-front, .klang-bay.open .bonnet-front { transition: none; }
 }

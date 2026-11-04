@@ -18,27 +18,53 @@ function sliderMarkup(macro: Macro, value: number): string {
     </label>`;
 }
 
-/** Edge: the Klang panel as a drawer hidden in the kalimba (mounted right after it): its pull shows under the belly; pulled, its sliders slide out, each macro's and a reset. */
-export function mountKlangPanel(root: HTMLElement, config: KlangPanelConfig): void {
-  const section = document.createElement('section');
-  section.className = 'klang-panel klang-drawer';
-  // the front last: pulled out, it moves down with the sliders behind it
-  section.innerHTML = `
-    <div class="klang-tray" inert>
-      <div class="klang-slide">
-        <div class="klang" id="klang-macros">
-          ${MACROS.map((m) => sliderMarkup(m, config.values[m.name])).join('')}
+/**
+ * Edge: the Klang panel under the kalimba's body, which becomes a bonnet hinged at its top edge: its latch on the belly;
+ * pulled, the body lifts and the sliders show beneath it, each macro's, a reset and a close.
+ */
+export function mountKlangPanel(kalimba: HTMLElement, config: KlangPanelConfig): void {
+  const doc = kalimba.ownerDocument;
+  const bay = doc.createElement('section');
+  bay.className = 'klang-panel klang-bay';
+  bay.innerHTML = `
+    <div class="klang-cavity" inert>
+      <div class="klang" id="klang-macros">
+        ${MACROS.map((m) => sliderMarkup(m, config.values[m.name])).join('')}
+        <div class="klang-actions">
           <button type="button" name="klang-reset" title="Alle Regler zurück, wie die Kalimba gebaut ist.">Zurücksetzen</button>
+          <button type="button" name="klang-close">Schließen</button>
         </div>
       </div>
     </div>
-    <button type="button" name="klang" class="drawer-front" aria-controls="klang-macros" aria-expanded="false" title="Klang bearbeiten"><span class="drawer-pull">Klang</span></button>`;
-  root.append(section);
+    <div class="bonnet">
+      <div class="bonnet-front">
+        <button type="button" name="klang" class="bonnet-latch" aria-controls="klang-macros" aria-expanded="false" title="Klang bearbeiten">Klang</button>
+      </div>
+      <div class="bonnet-underside" aria-hidden="true" title="Klang schließen"></div>
+    </div>`;
+  kalimba.replaceWith(bay);
+  const front = bay.querySelector<HTMLElement>('.bonnet-front')!;
+  front.prepend(kalimba);
 
-  const tray = section.querySelector<HTMLElement>('.klang-tray')!;
-  const front = section.querySelector<HTMLButtonElement>('[name="klang"]')!;
-  const slider = (macro: Macro) => section.querySelector<HTMLInputElement>(`input[name="${macro.name}"]`)!;
-  const shown = (macro: Macro) => section.querySelector<HTMLOutputElement>(`output[name="${macro.name}-value"]`)!;
+  const cavity = bay.querySelector<HTMLElement>('.klang-cavity')!;
+  const latch = bay.querySelector<HTMLButtonElement>('[name="klang"]')!;
+  const setOpen = (open: boolean) => {
+    bay.classList.toggle('open', open);
+    cavity.toggleAttribute('inert', !open); // shut: its sliders out of reach of Tab
+    front.toggleAttribute('inert', open); // lifted: the tongues and latch out of reach
+    latch.setAttribute('aria-expanded', String(open));
+    if (open) bay.querySelector<HTMLElement>('.klang input')?.focus({ preventScroll: true });
+    else if (cavity.contains(doc.activeElement)) latch.focus({ preventScroll: true });
+  };
+  latch.addEventListener('click', () => setOpen(true));
+  bay.querySelector('[name="klang-close"]')!.addEventListener('click', () => setOpen(false));
+  bay.querySelector('.bonnet-underside')!.addEventListener('click', () => setOpen(false));
+  doc.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && bay.classList.contains('open')) setOpen(false);
+  });
+
+  const slider = (macro: Macro) => bay.querySelector<HTMLInputElement>(`input[name="${macro.name}"]`)!;
+  const shown = (macro: Macro) => bay.querySelector<HTMLOutputElement>(`output[name="${macro.name}-value"]`)!;
   let values = config.values;
 
   const show = (macro: Macro) => (shown(macro).textContent = macro.format(values[macro.name]));
@@ -47,13 +73,6 @@ export function mountKlangPanel(root: HTMLElement, config: KlangPanelConfig): vo
     config.onChange(values);
   };
 
-  front.addEventListener('click', () => {
-    const open = !section.classList.contains('open');
-    section.classList.toggle('open', open);
-    tray.toggleAttribute('inert', !open); // shut: its sliders out of reach of Tab
-    front.setAttribute('aria-expanded', String(open));
-    front.title = open ? 'Klang schließen' : 'Klang bearbeiten';
-  });
   for (const macro of MACROS) {
     slider(macro).addEventListener('input', () => {
       set({ ...values, [macro.name]: Number(slider(macro).value) });
@@ -66,7 +85,7 @@ export function mountKlangPanel(root: HTMLElement, config: KlangPanelConfig): vo
       show(macro);
     });
   }
-  section.querySelector('[name="klang-reset"]')!.addEventListener('click', () => {
+  bay.querySelector('[name="klang-reset"]')!.addEventListener('click', () => {
     set(DEFAULT_KLANG);
     for (const macro of MACROS) {
       slider(macro).value = String(values[macro.name]);

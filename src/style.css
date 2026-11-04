@@ -43,6 +43,15 @@
   --tine-label: #1c1c1c;
   --retuned: #b3261e;
   --octave: #1a4fa0;        /* octave marks on the steel */
+  --forest: #101a14;        /* the page's own ground, wherever --bg is redefined */
+  /* the edit area: sand dunes over the forest, dark brown ink, the rose darkened to read on it */
+  --sand: #b38e55;          /* golden sand, clean, dark enough to sit next to the forest */
+  --sand-panel: #bd9a60;
+  --sand-field: #cbac77;
+  --sand-line: #94713d;
+  --sand-ink: #24170a;
+  --sand-muted: #36260f;    /* 4.5:1 on the band */
+  --sand-rose: #5c0d1b;
   --max-tongue: min(34vh, 360px);
   color-scheme: dark;
 }
@@ -58,11 +67,28 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 16px 48px;
+  padding: 0 16px 48px;
 }
 
 /* the title and how to play on one line, wrapping on a phone */
-header { width: min(100%, 1200px); display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 16px; margin-bottom: 10px; }
+header { width: min(100%, 1200px); display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 16px; padding: 12px 0 10px; }
+
+/* the edit area, title to song strip, in sand across the whole width; the kalimba's area stays forest */
+header, .practice {
+  --bg: var(--sand);
+  --panel: var(--sand-panel);
+  --field: var(--sand-field);
+  --line: var(--sand-line);
+  --text: var(--sand-ink);
+  --muted: var(--sand-muted);
+  --accent-soft: var(--sand-rose);
+  color-scheme: light;
+  color: var(--text);
+  background: var(--sand);
+  box-shadow: 0 0 0 100vmax var(--sand); /* out to the window's edges… */
+  clip-path: inset(0 -100vmax);          /* …but not above or below */
+}
+.practice { padding-bottom: 14px; }
 h1 { font-size: 1.3rem; margin: 0; letter-spacing: 0.01em; }
 h1 .key { color: var(--muted); font-weight: 400; }
 header p { color: var(--muted); font-size: 0.85rem; margin: 0; }
@@ -73,7 +99,7 @@ kbd {
   font-size: 0.85em;
 }
 
-#app { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+#app { width: 100%; display: flex; flex-direction: column; align-items: center; } /* the sand runs into the forest: no gap */
 
 .practice { width: min(100%, 1200px); display: flex; flex-direction: column; gap: 10px; }
 
@@ -103,7 +129,7 @@ input[type="range"], input[type="checkbox"] { accent-color: var(--accent); }
 
 /* buttons: Start the one filled; the rest outlined */
 button { font: inherit; cursor: pointer; }
-.controls button, .tuning-row button {
+.controls button, .song-strip button {
   height: 40px;
   padding: 0 18px;
   color: var(--text);
@@ -112,7 +138,7 @@ button { font: inherit; cursor: pointer; }
   border-radius: 10px;
   font-weight: 600;
 }
-.controls button:hover, .tuning-row button:hover, .import-row button:hover { border-color: var(--accent-soft); }
+.controls button:hover, .song-strip button:hover, .import-row button:hover { border-color: var(--accent-soft); }
 .controls button[name="start"] { height: 44px; padding: 0 30px; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; box-shadow: 0 4px 14px var(--glow); }
 .controls button[name="stop"] { height: 44px; }
 
@@ -184,11 +210,35 @@ button { font: inherit; cursor: pointer; }
 .format-help dd { margin: 0; font-size: 0.9rem; line-height: 1.4; }
 
 /* what's going on, and the tuning, on one line under the panels */
-.status-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 0 4px; }
-.status { flex: 1 1 320px; min-height: 1.3em; margin: 0; font-size: 0.9rem; }
-.tuning-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 0.9rem; color: var(--muted); }
-.tuning-row button { height: 36px; padding: 0 14px; font-weight: 400; }
-.tuning-row button[name="edit-text"] { border-color: var(--accent-soft); margin-right: 6px; }
+/* the strip with its edit button at its end; the strip itself opens the editor too */
+.song-strip { position: relative; }
+.song-strip .tab-view { padding-right: 214px; cursor: pointer; } /* the text never runs under the button */
+.song-strip button { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; font-weight: 400; border-color: var(--accent-soft); background: var(--panel); }
+.song-strip svg { width: 16px; height: 16px; fill: none; stroke: var(--accent-soft); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+/* on a phone only the pencil: the strip keeps its width for the song */
+@media (max-width: 700px) {
+  .song-strip .tab-view { padding-right: 56px; }
+  .song-strip button { padding: 0 10px; }
+  .song-strip .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+/* what's going on, over the falling notes' empty top */
+.highway-box .status {
+  position: absolute;
+  z-index: 1;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 16px);
+  margin: 0;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  font-size: 0.85rem;
+  text-align: center;
+  pointer-events: none;
+}
+.highway-box .status:empty { display: none; }
 .tongue.retuned .letter, .tongue.retuned .cipher { color: var(--retuned); }
 /* octave marks are easy to overlook: bigger, heavier, own colour */
 .tongue .octave { font-size: 1.6em; font-weight: 900; line-height: 0.6; margin-left: 1px; color: var(--octave); }
@@ -198,13 +248,13 @@ button { font: inherit; cursor: pointer; }
 .error:empty { display: none; }
 
 /* stage width follows the kalimba, so the highway lanes sit over the tongues; the body is centred, never stretched */
-.stage { display: inline-flex; flex-direction: column; align-items: center; max-width: 100%; padding-top: 6px; }
+.stage { display: inline-flex; flex-direction: column; align-items: center; max-width: 100%; padding-top: 16px; } /* room between the sand and the lanes */
 /* canvas out of flow: its bitmap (width × devicePixelRatio) must not widen the stage, or it grows every frame */
 .highway-box { position: relative; align-self: stretch; height: 21vh; min-height: 140px; margin-bottom: 14px; }
 .highway { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
 /* wood: its grain (fibres from noise, a few long lines), its sheen, over the board's own light-to-dark */
-.kalimba, .drawer-front, .klang {
+.kalimba, .bonnet-underside, .klang-cavity {
   --grain-lines: repeating-linear-gradient(179.2deg, transparent 0 9px, var(--wood-lines) 9px 10px, transparent 10px 23px, var(--wood-lines) 23px 25px, transparent 25px 41px);
 }
 
@@ -215,8 +265,9 @@ button { font: inherit; cursor: pointer; }
   gap: var(--gap);
   --side: clamp(10px, 3vw, 36px);
   --head: 30px; /* a tongue's end, from its tip to the bridge's far edge: a tap there retunes it */
-  padding: 8px var(--side) 40px;
-  border-radius: 18px 18px 48% 48% / 18px 18px 22% 22%;
+  --top: 18px; /* wood above the tongues' tips */
+  padding: var(--top) var(--side) 48px; /* the belly: room under the longest tongue for the latch */
+  border-radius: 18px 18px 48% 48% / 18px 18px 27% 27%;
   background:
     radial-gradient(ellipse 70% 45% at 50% 26%, var(--wood-sheen), transparent 70%),
     url('./wood-grain.svg') 0 0 / 100% 100% no-repeat,
@@ -237,7 +288,7 @@ button { font: inherit; cursor: pointer; }
   position: absolute;
   left: 6%;
   right: 6%;
-  top: calc(8px + var(--head) - 14px);
+  top: calc(var(--top) + var(--head) - 14px);
   pointer-events: none;
   height: 14px;
   border-radius: 4px;
@@ -274,7 +325,7 @@ button { font: inherit; cursor: pointer; }
 .tuning-reset {
   position: absolute;
   left: calc(var(--side) + 2px);
-  top: calc(8px + var(--max-tongue) * 0.44 + 26px);
+  top: calc(var(--top) + var(--max-tongue) * 0.44 + 26px);
   width: 32px;
   height: 32px;
   padding: 6px;
@@ -297,7 +348,7 @@ button { font: inherit; cursor: pointer; }
 .kalimba .engraving {
   position: absolute;
   right: var(--side);
-  top: calc(8px + var(--max-tongue) * 0.44 + 40px);
+  top: calc(var(--top) + var(--max-tongue) * 0.44 + 40px);
   width: max-content; /* the plate as wide as its longest line */
   margin: 0;
   text-align: center;

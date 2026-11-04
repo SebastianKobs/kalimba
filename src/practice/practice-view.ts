@@ -155,13 +155,10 @@ function controlsMarkup(songs: readonly PracticeSong[]): string {
         <button type="button" name="start">Start</button>
       </div>
     </div>
-    <div class="status-row">
-      <p class="status" role="status"></p>
-      <div class="tuning-row">
-        <button type="button" name="edit-text" aria-haspopup="dialog">Liedtext bearbeiten</button>
-      </div>
+    <div class="song-strip">
+      <pre class="tab-view" aria-label="Liedtext" title="Liedtext bearbeiten"></pre>
+      <button type="button" name="edit-text" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4" /></svg><span class="label">Liedtext bearbeiten</span></button>
     </div>
-    <pre class="tab-view" aria-label="Liedtext"></pre>
     ${songEditorMarkup()}
     ${formatHelpMarkup()}
     <p class="skipped"></p>
@@ -253,7 +250,11 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   highwayBox.className = 'highway-box';
   const canvas = doc.createElement('canvas');
   canvas.className = 'highway';
-  highwayBox.append(canvas);
+  // what's going on, over the falling notes' empty top: no row of its own
+  const status = doc.createElement('p');
+  status.className = 'status';
+  status.setAttribute('role', 'status');
+  highwayBox.append(canvas, status);
   stage.append(highwayBox);
   root.append(panel, stage);
 
@@ -265,7 +266,6 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const meterSelect = field<HTMLSelectElement>('meter');
   const clickBox = field<HTMLInputElement>('click');
   const textArea = field<HTMLTextAreaElement>('text');
-  const status = panel.querySelector<HTMLElement>('.status')!;
   const error = panel.querySelector<HTMLElement>('.error:not(.editor-error)')!;
   const editorError = panel.querySelector<HTMLElement>('.editor-error')!;
   const editor = panel.querySelector<HTMLDialogElement>('dialog.song-editor')!;
@@ -481,10 +481,12 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   field<HTMLButtonElement>('stop').addEventListener('click', stop);
   field<HTMLButtonElement>('import').addEventListener('click', importSong);
   // what plays is what the text says: editing it stops the song
-  field<HTMLButtonElement>('edit-text').addEventListener('click', () => {
+  const editText = () => {
     if (session) stop();
     editor.showModal();
-  });
+  };
+  field<HTMLButtonElement>('edit-text').addEventListener('click', editText);
+  tabView.addEventListener('click', editText);
   wireOverlay(editor, 'song-editor-close');
   const formatHelp = panel.querySelector<HTMLDialogElement>('dialog.format-help')!;
   field<HTMLButtonElement>('format-help').addEventListener('click', () => formatHelp.showModal());

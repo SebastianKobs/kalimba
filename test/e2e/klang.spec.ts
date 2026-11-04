@@ -4,7 +4,7 @@ test('the Klang panel opens on its macros, and a slider moves the sound', async 
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.goto('/');
-  await page.click('.drawer-pull');
+  await page.click('[name="klang"]');
   await expect(page.locator('.klang')).toBeVisible();
   await page.locator('input[name="stimmung"]').fill('20');
   await expect(page.locator('output[name="stimmung-value"]')).toHaveText('+20 Cent');
@@ -13,80 +13,71 @@ test('the Klang panel opens on its macros, and a slider moves the sound', async 
   expect(errors).toEqual([]);
 });
 
-// the drawer's own transitions: what is moving while it opens or shuts
-const sliding = (page: Page) =>
-  page.locator('.klang-drawer').evaluate((drawer) =>
-    drawer.getAnimations({ subtree: true }).flatMap((a) => ('transitionProperty' in a ? [(a as CSSTransition).transitionProperty] : [])),
+// the bonnet's own transitions: what is moving while it lifts or shuts
+const lifting = (page: Page) =>
+  page.locator('.klang-bay').evaluate((bay) =>
+    bay.getAnimations({ subtree: true }).flatMap((a) => ('transitionProperty' in a ? [(a as CSSTransition).transitionProperty] : [])),
   );
-const frontTop = (page: Page) => page.locator('[name="klang"]').evaluate((front) => front.getBoundingClientRect().top + scrollY); // on the page: the click scrolls
 
-test.describe('the Klang drawer', () => {
-  test('shut, it is hidden in the kalimba: its front behind the body, only its pull showing under the belly', async ({ page }) => {
+test.describe('the Klang bonnet', () => {
+  test('shut, the kalimba is whole: its latch on the belly, inside the body, and no sliders', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.klang')).toBeHidden();
-    const shut = await page.locator('.kalimba').evaluate((kalimba) => {
-      kalimba.scrollIntoView({ block: 'center' });
-      const front = document.querySelector('[name="klang"]')!.getBoundingClientRect();
-      const pull = document.querySelector('.drawer-pull')!.getBoundingClientRect();
+    const latch = await page.locator('.kalimba').evaluate((kalimba) => {
+      const box = document.querySelector('[name="klang"]')!.getBoundingClientRect();
       const body = kalimba.getBoundingClientRect();
-      const onTop = document.elementFromPoint(front.left + front.width / 2, front.top + front.height / 2);
-      return { frontBelow: front.bottom - body.bottom, pullBelow: pull.bottom - body.bottom, covered: kalimba.contains(onTop) };
+      return { inside: box.left > body.left && box.right < body.right && box.top > body.top && box.bottom < body.bottom };
     });
-    expect(shut.frontBelow).toBeLessThan(0);
-    expect(shut.covered).toBe(true);
-    expect(shut.pullBelow).toBeGreaterThan(10);
+    expect(latch.inside).toBe(true); // nothing hangs under the body
   });
 
-  test('pulled out, its front is clear of the kalimba', async ({ page }) => {
+  test('lifts the body on its hinge, its top edge staying put, and shows every slider where it lay', async ({ page }) => {
     await page.goto('/');
-    await page.click('.drawer-pull');
-    await expect.poll(() => sliding(page)).toEqual([]);
-    const clear = await page.locator('[name="klang"]').evaluate((front) => {
-      front.scrollIntoView({ block: 'center' });
-      const box = front.getBoundingClientRect();
-      return front.contains(document.elementFromPoint(box.left + box.width / 2, box.top + 4));
-    });
-    expect(clear).toBe(true);
-  });
-
-  test('slides open: the drawer grows while its front moves down, then shows every slider', async ({ page }) => {
-    await page.goto('/');
-    const shut = await frontTop(page);
-    await page.click('.drawer-pull');
-    expect(await sliding(page)).toContain('grid-template-rows');
+    const hingeBefore = await page.locator('.bonnet').evaluate((b) => b.getBoundingClientRect().top);
+    await page.click('[name="klang"]');
+    expect(await lifting(page)).toContain('transform');
+    await expect.poll(() => lifting(page)).toEqual([]);
     await expect(page.locator('.klang')).toBeVisible();
-    await expect.poll(() => sliding(page)).toEqual([]);
-    const open = await frontTop(page);
-    const sliders = await page.locator('.klang').evaluate((k) => k.getBoundingClientRect().height);
-    expect(open - shut).toBeCloseTo(sliders, -1); // moved by the whole drawer
+    const open = await page.locator('.klang-bay').evaluate((bay) => ({
+      lifted: getComputedStyle(bay.querySelector('.bonnet')!).transform !== 'none',
+      sliderTop: bay.querySelector('.klang input')!.getBoundingClientRect().top,
+      bayTop: bay.getBoundingClientRect().top,
+    }));
+    expect(open.lifted).toBe(true);
+    expect(open.bayTop).toBeCloseTo(hingeBefore, 0);
+    expect(open.sliderTop).toBeGreaterThan(open.bayTop); // under where the body was
   });
 
-  test('slides shut again, and hides its sliders once shut', async ({ page }) => {
+  test('shuts from its button and from Escape, and hides its sliders once down', async ({ page }) => {
     await page.goto('/');
-    await page.click('.drawer-pull');
-    await expect.poll(() => sliding(page)).toEqual([]);
-    await page.click('.drawer-pull');
-    expect(await sliding(page)).toContain('grid-template-rows');
-    await expect(page.locator('.klang')).toBeHidden();
+    for (const shut of [() => page.click('[name="klang-close"]'), () => page.keyboard.press('Escape')]) {
+      await page.click('[name="klang"]');
+      await expect.poll(() => lifting(page)).toEqual([]);
+      await shut();
+      await expect.poll(() => lifting(page)).toEqual([]);
+      await expect(page.locator('.klang')).toBeHidden();
+      await expect(page.locator('[name="klang"]')).toBeVisible();
+    }
   });
 
-  test('at phone width every slider and its value fit in the drawer', async ({ page }) => {
+  test('at phone width every slider and its value fit, and the lifted lid widens nothing', async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
     await page.goto('/');
-    await page.click('.drawer-pull');
-    await expect.poll(() => sliding(page)).toEqual([]);
+    await page.click('[name="klang"]');
+    await expect.poll(() => lifting(page)).toEqual([]);
     const overflowing = await page.locator('.klang').evaluate((klang) => {
       const inside = klang.getBoundingClientRect();
-      return [...klang.querySelectorAll('output, input')].filter((e) => e.getBoundingClientRect().right > inside.right).map((e) => e.getAttribute('name'));
+      return [...klang.querySelectorAll('output, input, button')].filter((e) => e.getBoundingClientRect().right > inside.right || e.getBoundingClientRect().bottom > inside.bottom).map((e) => e.getAttribute('name'));
     });
     expect(overflowing).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(420);
   });
 
-  test('opens without sliding when the system asks for less motion', async ({ page }) => {
+  test('opens without moving when the system asks for less motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
-    await page.click('.drawer-pull');
-    expect(await sliding(page)).toEqual([]);
+    await page.click('[name="klang"]');
+    expect(await lifting(page)).toEqual([]);
     await expect(page.locator('.klang')).toBeVisible();
   });
 });

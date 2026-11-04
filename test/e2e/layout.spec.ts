@@ -100,3 +100,12 @@ test('the engraved tuning stays on the wood, clear of every tongue, even with al
     expect(fit, `at ${width} px`).toEqual({ lines: 4, onBody: true, clear: true });
   }
 });
+
+test('is styled before any script runs: no flash of the unstyled page', async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(16, 26, 20)'); // --bg, from the stylesheet alone
+  await expect(page.locator('h1')).toHaveCSS('font-size', /^20\.8/); // the header as styled (1.3rem, Firefox rounds to 1/60 px), not the browser's 2em
+  await context.close();
+});

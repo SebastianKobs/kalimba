@@ -262,6 +262,19 @@ describe('mountPractice', () => {
   });
 
   describe('the song text', () => {
+    it('opens for editing from its strip: a button at its end, or a click anywhere on it', () => {
+      const { q } = setup();
+      expect(q('.song-strip [name="edit-text"]')).not.toBeNull();
+      q<HTMLElement>('.tab-view').click();
+      expect(q<HTMLDialogElement>('dialog.song-editor').open).toBe(true);
+    });
+
+    it('leaves no row of its own under the controls: the status sits over the falling notes', () => {
+      const { q } = setup();
+      expect(q('.status-row')).toBeNull();
+      expect(q('.highway-box [role="status"]')).not.toBeNull();
+    });
+
     const now = (q: ReturnType<typeof setup>['q']) => [...q('.tab-view').querySelectorAll('.now')].map((el) => el.textContent);
     const editorOpen = (q: ReturnType<typeof setup>['q']) => q<HTMLDialogElement>('dialog.song-editor').open;
 

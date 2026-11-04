@@ -4,9 +4,12 @@ import { mountKlangPanel } from '../../src/sound/klang-panel';
 
 function setup(values: KlangValues = DEFAULT_KLANG) {
   const root = document.createElement('div');
+  const kalimba = document.createElement('div');
+  kalimba.className = 'kalimba';
+  root.append(kalimba);
   document.body.append(root);
   const changes: KlangValues[] = [];
-  mountKlangPanel(root, { values, onChange: (next) => changes.push(next) });
+  mountKlangPanel(kalimba, { values, onChange: (next) => changes.push(next) });
   const q = <T extends Element>(selector: string) => root.querySelector<T>(selector);
   const toggle = () => q<HTMLButtonElement>('[name="klang"]')!.click();
   const slide = (name: string, value: number) => {
@@ -15,39 +18,47 @@ function setup(values: KlangValues = DEFAULT_KLANG) {
     slider.dispatchEvent(new Event('input', { bubbles: true }));
   };
   const shown = (name: string) => q(`output[name="${name}-value"]`)!.textContent;
-  return { root, changes, q, toggle, slide, shown };
+  return { root, kalimba, changes, q, toggle, slide, shown };
 }
 
 afterEach(() => document.body.replaceChildren());
 
 describe('mountKlangPanel', () => {
-  it('is a drawer under the kalimba: shut until its front is pulled, then a slider for each macro, labelled in German', () => {
-    const { q, root, toggle } = setup();
-    const front = q<HTMLButtonElement>('[name="klang"]')!;
-    const drawer = q<HTMLElement>('.klang-drawer')!;
-    expect(front.textContent).toBe('Klang');
-    expect(front.title).toBe('Klang bearbeiten');
-    expect(front.getAttribute('aria-expanded')).toBe('false');
-    expect(drawer.classList.contains('open')).toBe(false);
+  it('makes the kalimba’s body a bonnet over its sliders: shut until its latch is pulled, then a slider for each macro, labelled in German', () => {
+    const { q, root, kalimba, toggle } = setup();
+    const bay = q<HTMLElement>('.klang-bay')!;
+    const latch = q<HTMLButtonElement>('[name="klang"]')!;
+    expect(kalimba.parentElement).toBe(q('.bonnet-front'));
+    expect(latch.closest('.bonnet-front')).not.toBeNull(); // on the body, lifted with it
+    expect(latch.textContent).toBe('Klang');
+    expect(latch.title).toBe('Klang bearbeiten');
+    expect(latch.getAttribute('aria-expanded')).toBe('false');
+    expect(latch.getAttribute('aria-controls')).toBe(q('.klang')!.id);
+    expect(bay.classList.contains('open')).toBe(false);
     expect(q('.klang')!.closest('[inert]')).not.toBeNull(); // shut: its sliders out of reach of Tab
     toggle();
-    expect(front.getAttribute('aria-expanded')).toBe('true');
-    expect(front.title).toBe('Klang schließen');
-    expect(drawer.classList.contains('open')).toBe(true);
+    expect(latch.getAttribute('aria-expanded')).toBe('true');
+    expect(bay.classList.contains('open')).toBe(true);
     expect(q('.klang')!.closest('[inert]')).toBeNull();
+    expect(q('.bonnet-front')!.hasAttribute('inert')).toBe(true); // lifted: its tongues and latch out of reach
     expect([...root.querySelectorAll('.klang label .macro-label')].map((l) => l.textContent)).toEqual(MACROS.map((m) => m.label));
     expect(q('input[name="stimmung"]')!.closest('label')!.title).toMatch(/Cent/);
-    toggle();
-    expect(front.getAttribute('aria-expanded')).toBe('false');
-    expect(drawer.classList.contains('open')).toBe(false);
   });
 
-  it('has its front below its sliders, as a drawer pulled out has', () => {
-    const { q } = setup();
-    const drawer = q('.klang-drawer')!;
-    expect(drawer.lastElementChild).toBe(q('[name="klang"]'));
-    expect(q('[name="klang"] .drawer-pull')!.textContent).toBe('Klang'); // what shows of it, shut
-    expect(q('[name="klang"]')!.getAttribute('aria-controls')).toBe(q('.klang')!.id);
+  it('shuts from its own button, from Escape and from a click on the lifted lid, the latch then in reach again', () => {
+    const { q, toggle } = setup();
+    const bay = q<HTMLElement>('.klang-bay')!;
+    const shutBy = (action: () => void) => {
+      toggle();
+      expect(bay.classList.contains('open')).toBe(true);
+      action();
+      expect(bay.classList.contains('open')).toBe(false);
+      expect(q('.bonnet-front')!.hasAttribute('inert')).toBe(false);
+      expect(q('[name="klang"]')!.getAttribute('aria-expanded')).toBe('false');
+    };
+    shutBy(() => q<HTMLButtonElement>('[name="klang-close"]')!.click());
+    shutBy(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    shutBy(() => q<HTMLElement>('.bonnet-underside')!.click()); // the inside of the lid, what shows of it lifted
   });
 
   it('shows Helligkeit at 3500 Hz to start', () => {

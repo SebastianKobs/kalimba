@@ -52,6 +52,13 @@ function drawNoteLabel(ctx: CanvasRenderingContext2D, tongue: Tongue, centre: nu
 }
 
 /** Canvas lane per tongue; notes fall onto the hit line at the bridge, one beat every PIXELS_PER_BEAT. */
+// where it lies on the page as laid out, transforms ignored: a lifted bonnet must not move the lanes
+function pageLeft(el: HTMLElement): number {
+  let left = 0;
+  for (let node: HTMLElement | null = el; node; node = node.offsetParent as HTMLElement | null) left += node.offsetLeft;
+  return left;
+}
+
 export function canvasHighway(canvas: HTMLCanvasElement, kalimba: KalimbaHandle): Highway {
   const ctx = canvas.getContext('2d');
   return {
@@ -66,11 +73,8 @@ export function canvasHighway(canvas: HTMLCanvasElement, kalimba: KalimbaHandle)
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       ctx.clearRect(0, 0, width, height);
 
-      const origin = canvas.getBoundingClientRect().left;
-      const lanes = kalimba.tongueElements.map((el) => {
-        const r = el.getBoundingClientRect();
-        return { centre: r.left - origin + r.width / 2, width: r.width };
-      });
+      const origin = pageLeft(canvas);
+      const lanes = kalimba.tongueElements.map((el) => ({ centre: pageLeft(el) - origin + el.offsetWidth / 2, width: el.offsetWidth }));
       const hitY = height - NOTE_HEIGHT / 2 - 2;
       const colours = {
         lane: cssColour(canvas, '--lane', '#ffffff14'),
