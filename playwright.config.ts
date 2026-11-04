@@ -15,7 +15,8 @@ export default defineConfig({
   },
   projects: [{ name: 'firefox' }],
   webServer: {
-    command: `npx vite --port ${PORT} --strictPort --clearScreen false`,
+    // vite itself, not through npx: npx spends minutes on its checks before the server starts
+    command: `./node_modules/.bin/vite --port ${PORT} --strictPort --clearScreen false`,
     url: `http://localhost:${PORT}/`,
     reuseExistingServer: true,
   },

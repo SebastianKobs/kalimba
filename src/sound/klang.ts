@@ -170,8 +170,8 @@ export function resonanceGain(values: KlangValues): number {
   return RESONANCE_AT_100 * values.resonanz;
 }
 
-// Hall at 100 %: the send into the room, half the first one (0.3), as set by ear
-const HALL_AT_100 = 0.15;
+// Hall at 100 %: the send into the room, as set by ear (225 % of the 0.15 before)
+const HALL_AT_100 = 0.3375;
 
 /** Hall: the gain of the send into the room. */
 export function hallGain(values: KlangValues): number {
@@ -188,8 +188,8 @@ export function ringFactor(values: KlangValues): number {
   return values.nachklang;
 }
 
-// .2: the macros' scales changed (the user's ear made 100 %), so what was stored before would apply twice
-export const KLANG_STORAGE_KEY = 'kalimba.klang.2';
+// .3: the macros' scales changed again (Anschlag and Hall by ear made 100 %), so what was stored before would apply twice
+export const KLANG_STORAGE_KEY = 'kalimba.klang.3';
 
 /** Macro values read back from storage: each within its range, its default otherwise. */
 export function parseStoredKlang(raw: string | null): KlangValues {

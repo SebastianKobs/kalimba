@@ -50,10 +50,11 @@ export interface PracticeView {
   unmount(): void;
 }
 
+// the first is chosen at the start: hear the song first, then play along, or step by step
 const MODES: readonly [PracticeMode, string][] = [
-  ['wait', 'Warten: Schritt für Schritt'],
-  ['play-along', 'Mitspielen: im Takt'],
   ['listen', 'Anhören: die Kalimba spielt'],
+  ['play-along', 'Mitspielen: im Takt'],
+  ['wait', 'Warten: Schritt für Schritt'],
 ];
 
 const FORMAT_HELP =

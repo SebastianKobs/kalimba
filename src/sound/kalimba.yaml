@@ -36,7 +36,7 @@ instruments:
       - name: click
         kind: Noise source
         role: source
-        values: { cutoff: 3000, level: 0.385, offset: 1.75 } # level by ear: the Klang panel's Anschlag at 154 %, now its 100 %
+        values: { cutoff: 3000, level: 0.285, offset: 1.75 } # level by ear: the Klang panel's Anschlag at 154 %, then 74 % of that, now its 100 %
         settings: { filter/type: highpass }
       # the box: a short wooden knock at a fixed 240 Hz, whatever the note
       - { name: knock, kind: VCO, role: source, values: { frequency: 240, level: 0.08 } }
@@ -65,7 +65,7 @@ instruments:
       - name: click env
         kind: Envelope generator
         role: modulator
-        values: { attack: 0.0003, decay: 0.031, sustain: 0, release: 0.03 }
+        values: { attack: 0.0003, decay: 0.0229, sustain: 0, release: 0.03 } # decay by ear: 74 % of 31 ms, with the level
         settings: { envelope/mode: gate }
       - name: knock env
         kind: Envelope generator

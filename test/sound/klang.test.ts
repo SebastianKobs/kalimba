@@ -14,10 +14,10 @@ describe('the Klang macros', () => {
 
   it('at their defaults, sound like the voice card as written', () => {
     expect(preset({})).toMatchObject({
-      // the user's ear at 100 %: Obertöne as 163 %, Anschlag 154 %, Rauheit 162 % of before
+      // the user's ear at 100 %: Obertöne as 163 %, Anschlag 154 % then 74 %, Rauheit 162 % of before
       '2nd/level': 0.00163, '3rd/level': 0.00082, '5th/level': 0.00041, '7th/level': 0.00049, '9th/level': 0.00033,
       'ping/level': 0.13, 'ting/level': 0.0098, 'grit/level': 0.0148, '7th/tune': 0.13, '9th/tune': 0.19,
-      'knock/level': 0.08, 'twin/level': 0.12, 'twin/tune': 0.03, 'click/level': 0.385, 'click env/decay': 0.031,
+      'knock/level': 0.08, 'twin/level': 0.12, 'twin/tune': 0.03, 'click/level': 0.285, 'click env/decay': 0.0229,
     });
     expect(preset({})['tone/cutoff']).toBeCloseTo(3500, -1); // within 5 Hz
     expect(pitchOffset(DEFAULT_KLANG)).toBe(0);
@@ -57,8 +57,8 @@ describe('the Klang macros', () => {
 
   it('Anschlag scales the thumb’s click, louder and a little longer: 0 none, 2 twice', () => {
     expect(preset({ anschlag: 0 })['click/level']).toBe(0);
-    expect(preset({ anschlag: 2 })['click/level']).toBeCloseTo(0.77, 6);
-    expect(preset({ anschlag: 2 })['click env/decay']).toBeCloseTo(0.062, 6);
+    expect(preset({ anschlag: 2 })['click/level']).toBeCloseTo(0.57, 6);
+    expect(preset({ anschlag: 2 })['click env/decay']).toBeCloseTo(0.0458, 6);
   });
 
   it('Körper scales the box knock', () => {
@@ -83,7 +83,7 @@ describe('the Klang macros', () => {
     expect(hallGain(values({ hall: 0 }))).toBe(0);
     expect(hallGain(values({ hall: 2 })) / hallGain(DEFAULT_KLANG)).toBeCloseTo(2, 9);
     expect(DEFAULT_KLANG.hall).toBe(1);
-    expect(hallGain(DEFAULT_KLANG)).toBeCloseTo(0.15, 9); // 100 %: half the first room's send, by ear
+    expect(hallGain(DEFAULT_KLANG)).toBeCloseTo(0.3375, 9); // 100 %: by ear, 225 % of the 0.15 before
   });
 
   it('Stimmung moves every note in cents; Nachklang scales how long they ring', () => {
@@ -102,7 +102,7 @@ describe('instrumentsWith', () => {
 
 describe('the stored macros', () => {
   it('live under a key of their own, new since the scales changed: what was stored before is let go', () => {
-    expect(KLANG_STORAGE_KEY).toBe('kalimba.klang.2');
+    expect(KLANG_STORAGE_KEY).toBe('kalimba.klang.3');
   });
 });
 

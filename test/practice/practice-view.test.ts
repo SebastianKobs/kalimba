@@ -67,10 +67,15 @@ function setup(tuning?: number[], songPlayer?: SongClock) {
 afterEach(() => document.body.replaceChildren());
 
 describe('mountPractice', () => {
+  it('starts with the kalimba playing the song: listening is the mode chosen', () => {
+    const { q } = setup();
+    expect(q<HTMLSelectElement>('[name="mode"]').value).toBe('listen');
+  });
+
   it('speaks German', () => {
     const { q } = setup();
     const texts = (selector: string) => [...q(`${selector}`).querySelectorAll('option')].map((o) => o.text);
-    expect(texts('[name="mode"]')).toEqual(['Warten: Schritt für Schritt', 'Mitspielen: im Takt', 'Anhören: die Kalimba spielt']);
+    expect(texts('[name="mode"]')).toEqual(['Anhören: die Kalimba spielt', 'Mitspielen: im Takt', 'Warten: Schritt für Schritt']);
     expect(['start', 'stop', 'import', 'retune', 'retune-reset'].map((name) => q(`[name="${name}"]`).textContent)).toEqual([
       'Start', 'Stopp', 'Importieren', 'Umstimmen', 'Stimmung zurücksetzen',
     ]);
