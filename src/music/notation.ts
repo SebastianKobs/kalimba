@@ -15,10 +15,19 @@ export interface SongNote {
   readonly source: SourceRange;
 }
 
+/** A played part of the text, a note, a group, a hold or a rest, with when it plays and for how long: what the song window lights. */
+export interface TextMark {
+  readonly beat: number;
+  readonly beats: number;
+  readonly source: SourceRange;
+}
+
 export interface Song {
   readonly title: string;
   readonly beatsPerMinute: number;
   readonly notes: readonly SongNote[];
+  /** every played part of the text in order, holds and rests too */
+  readonly marks: readonly TextMark[];
   readonly lengthBeats: number;
   readonly ignored: readonly IgnoredText[];
 }
@@ -41,7 +50,12 @@ const DURATION = '([_.]*)';
 const SINGLE = new RegExp(`^${PITCH}${DURATION}$`);
 // inside ( ) or [ ] notes sound together, separated by spaces, - or nothing
 const CHORD_JOINERS = /[[\]()\s-]/g;
-const HOLD = '-';
+/** A - holding the note before it a beat longer, and where it's written. */
+interface Hold {
+  readonly hold: true;
+  readonly source: SourceRange;
+}
+const isHold = (item: Onset | Hold): item is Hold => 'hold' in item;
 const GROUP = /^(?:\([^)]*\)|\[[^\]]*\])$/;
 const REST = /^0([_.]*)$/;
 const AMBIGUOUS_DOT = /[•·]/;
@@ -129,10 +143,11 @@ function readOnset(part: string, context: PitchContext): Onset | undefined {
  * What one token says, in order: onsets and holds. A - after a note holds it a beat longer,
  * whether it stands alone ("2 -") or the next note follows without a space ("2-4").
  */
-function readToken(token: string, tokenStart: number, context: PitchContext): (Onset | typeof HOLD)[] | undefined {
-  const items: (Onset | typeof HOLD)[] = [];
+function readToken(token: string, tokenStart: number, context: PitchContext): (Onset | Hold)[] | undefined {
+  const items: (Onset | Hold)[] = [];
   for (const [i, part] of splitAtHolds(token).entries()) {
-    if (i > 0) items.push(HOLD);
+    // the - just before this part
+    if (i > 0) items.push({ hold: true, source: { start: tokenStart + part.start - 1, end: tokenStart + part.start } });
     if (part.text === '') continue;
     const onset = readOnset(part.text.normalize('NFD'), context);
     if (!onset) return undefined;
@@ -207,8 +222,8 @@ export function keyOf(text: string): string | undefined {
 
 
 /** A line is music when its notes outnumber what can't be read; prose with a stray "A" is not. */
-function isMostlyNotes(readings: ((Onset | typeof HOLD)[] | undefined)[]): boolean {
-  const notes = readings.filter((r) => r !== undefined && r.some((item) => item !== HOLD)).length;
+function isMostlyNotes(readings: ((Onset | Hold)[] | undefined)[]): boolean {
+  const notes = readings.filter((r) => r !== undefined && r.some((item) => !isHold(item))).length;
   const unknown = readings.filter((r) => r === undefined).length;
   return unknown === 0 || notes > unknown;
 }
@@ -244,6 +259,7 @@ export function parseSong(text: string, options: ParseOptions = {}): Song {
   let title = 'Ohne Titel';
   let beatsPerMinute = DEFAULT_TEMPO;
   const onsets: { beat: number; onset: Onset }[] = [];
+  const marks: TextMark[] = [];
   const ignored: IgnoredText[] = [];
   let beat = 0;
 
@@ -284,13 +300,15 @@ export function parseSong(text: string, options: ParseOptions = {}): Song {
       }
       for (const item of reading) {
         const last = onsets.at(-1);
-        if (item === HOLD && !last) {
+        if (isHold(item) && !last) {
           ignored.push(ignoredToken(tokens[k], lineNumber)); // a hold with nothing to hold
-        } else if (item === HOLD) {
+        } else if (isHold(item)) {
           last!.onset.beats += 1;
+          marks.push({ beat, beats: 1, source: item.source });
           beat += 1;
         } else {
           onsets.push({ beat, onset: item });
+          marks.push({ beat, beats: item.beats, source: item.source! });
           beat += item.beats;
         }
       }
@@ -305,5 +323,5 @@ export function parseSong(text: string, options: ParseOptions = {}): Song {
     const skipped = ignored.length > 0 ? ` (${unreadable} übersprungen)` : '';
     throw new SongTextError(`Keine Noten gefunden${skipped}. Kalimba-Zahlen (1–7) oder Buchstaben (C–B) einfügen.`);
   }
-  return { title, beatsPerMinute, notes, lengthBeats: beat, ignored };
+  return { title, beatsPerMinute, notes, marks, lengthBeats: beat, ignored };
 }

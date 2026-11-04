@@ -400,6 +400,22 @@ describe('mountPractice', () => {
       expect(now(q)).toEqual(['E4']);
     });
 
+    it('lights a hold and a rest as their beats pass, not only the notes', () => {
+      const { q, set, start, view } = setup();
+      set('mode', 'listen');
+      set('text', 'C4 - 0 E4');
+      set('tempo', '60');
+      start();
+      view.tick(0.5);
+      expect(now(q)).toEqual(['C4']);
+      view.tick(1);
+      expect(now(q)).toEqual(['-']);
+      view.tick(1);
+      expect(now(q)).toEqual(['0']);
+      view.tick(1);
+      expect(now(q)).toEqual(['E4']);
+    });
+
     it('drops the highlight when stopped or done', () => {
       const { q, set, start, check, view, press } = setup();
       set('mode', 'wait');

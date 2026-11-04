@@ -1,9 +1,9 @@
 import { mountKalimba, type KalimbaHandle, type Plucker } from '../kalimba-view';
 import { retune, type Tongue } from '../layout';
-import { arrange, transposeOptions, type ArrangedNote, type Arrangement, type TransposeOption } from '../music/arrange';
+import { arrange, transposeOptions, type Arrangement, type TransposeOption } from '../music/arrange';
 import { describeShift } from '../music/interval';
 import { homeNoteOf, tuningFor, type TuningOption } from '../music/retune-for';
-import { DEFAULT_TEMPO, keyOf, meterOf, parseSong, SongTextError, tempoOf, titleOf, type IgnoredText, type Meter, type SourceRange } from '../music/notation';
+import { DEFAULT_TEMPO, keyOf, meterOf, parseSong, SongTextError, tempoOf, titleOf, type IgnoredText, type Meter, type SourceRange, type TextMark } from '../music/notation';
 import { clicksBetween } from './metronome';
 import { PracticeSession, type PracticeMode } from './session';
 import type { SongStart } from './song-player';
@@ -303,6 +303,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const tabView = panel.querySelector<HTMLElement>('.tab-view')!;
   let tabMarks = new Map<number, HTMLElement>();
   let highlighted: HTMLElement[] = [];
+  let songMarks: readonly TextMark[] = []; // the running song's played parts: notes, holds, rests
   let session: PracticeSession | undefined;
   let fit = '';
   let halfSteps = config.tongues.map((_, i) => config.tuning?.[i] ?? 0);
@@ -327,14 +328,14 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   // the strip shows the song as written, from its first notes on; while it runs, the part being played is highlighted
   const showText = () => {
     highlighted = [];
-    const notes = notesIn(textArea.value);
-    tabMarks = renderTabView(tabView, textArea.value, notes);
-    showLineOf(tabMarks.get(notes[0]?.source.start ?? -1));
+    const marks = marksIn(textArea.value);
+    tabMarks = renderTabView(tabView, textArea.value, marks);
+    showLineOf(tabMarks.get(marks[0]?.source.start ?? -1));
   };
 
-  const notesIn = (text: string) => {
+  const marksIn = (text: string): readonly TextMark[] => {
     try {
-      return parseSong(text, { tongues }).notes;
+      return parseSong(text, { tongues }).marks;
     } catch (e) {
       if (!(e instanceof SongTextError)) throw e;
       return [];
@@ -346,9 +347,9 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     tabView.scrollTop = mark ? Math.max(0, mark.offsetTop - parseFloat(getComputedStyle(tabView).paddingTop || '0')) : 0;
   };
 
-  const highlight = (notes: readonly ArrangedNote[]) => {
+  const highlight = (parts: readonly { readonly source: SourceRange }[]) => {
     highlighted.forEach((mark) => mark.classList.remove('now'));
-    highlighted = notes.map((n) => tabMarks.get(n.source.start)).filter((mark) => mark !== undefined);
+    highlighted = parts.map((p) => tabMarks.get(p.source.start)).filter((mark) => mark !== undefined);
     highlighted.forEach((mark) => mark.classList.add('now'));
     if (highlighted[0]) showLineOf(highlighted[0]);
   };
@@ -358,8 +359,12 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     controls.classList.toggle('playing', running);
     kalimba.setTargets(running ? session!.targets() : []);
     if (session) status.textContent = [fit, describeScore(session)].filter(Boolean).join(' — ');
-    highlight(running ? session!.currentNotes() : []);
+    highlight(running ? playingNow(session!) : []);
   };
+
+  // waiting, the notes to play next; otherwise whatever part of the text covers the beat, a hold or a rest too
+  const playingNow = (running: PracticeSession) =>
+    running.mode === 'wait' ? running.currentNotes() : songMarks.filter((m) => m.beat <= running.beat && running.beat < m.beat + m.beats);
 
   const setTempo = (bpm: number) => {
     tempoInput.value = String(bpm);
@@ -480,7 +485,8 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
       const leadInBeats = clickBox.checked ? beatsPerBar() : 0;
       session = new PracticeSession(arrangement, modeSelect.value as PracticeMode, { beatsPerBar: beatsPerBar(), leadInBeats });
       playOnClock(session, leadInBeats);
-      tabMarks = renderTabView(tabView, textArea.value, arrangement.notes);
+      songMarks = song.marks;
+      tabMarks = renderTabView(tabView, textArea.value, song.marks);
       // a title line in the text wins: it may be a built-in edited into something else
       fit = describeFit(titleOf(textArea.value) ?? selectedSong()?.title ?? song.title, arrangement);
       refresh();

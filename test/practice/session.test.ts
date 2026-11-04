@@ -104,4 +104,23 @@ describe('PracticeSession', () => {
       expect(notes(s.currentNotes().map((n) => n.tongue))).toEqual(['E4']);
     });
   });
+
+  describe('inView: what the falling notes show', () => {
+    const inView = (s: PracticeSession) => s.inView().map((n) => n.tongue.note);
+
+    it('keeps a held note in view while it sounds, listening, until its last beat is over', () => {
+      const s = session('C4 - E4', 'listen');
+      s.advance(3); // beat 1: C4 struck a beat ago, held for one more
+      expect(inView(s)).toEqual(['C4', 'E4']);
+      s.advance(1.5); // beat 2.5: C4 over, E4 sounding
+      expect(inView(s)).toEqual(['E4']);
+    });
+
+    it('shows only what is still to play while waiting: time stands, nothing sounds by itself', () => {
+      const s = session('C4 - E4', 'wait');
+      s.advance(5);
+      s.pluck(tongue('C4'));
+      expect(inView(s)).toEqual(['E4']);
+    });
+  });
 });

@@ -7,6 +7,23 @@ import type { PracticeSession } from './session';
 const PIXELS_PER_BEAT = 64;
 const NOTE_HEIGHT = 34;
 const FONT_SIZE = 11;
+const NOTE_GAP = 3; // between a note's end and the next one's head
+const MIN_NOTE = 14; // a 16th still a block, not a line
+const FULL_LABEL = 30; // a head this tall has room for the letter and the number
+
+export interface NoteShape {
+  /** from its head's foot to its end, in pixels */
+  readonly length: number;
+  readonly head: number;
+  readonly label: 'full' | 'letter';
+}
+
+/** A falling note as long as it lasts: its head where it lands, the held rest of it above. */
+export function noteShape(beats: number): NoteShape {
+  const length = Math.max(MIN_NOTE, beats * PIXELS_PER_BEAT - NOTE_GAP);
+  const head = Math.min(NOTE_HEIGHT, length);
+  return { length, head, label: head >= FULL_LABEL ? 'full' : 'letter' };
+}
 
 function cssColour(el: Element, name: string, fallback: string): string {
   return getComputedStyle(el).getPropertyValue(name).trim() || fallback;
@@ -109,20 +126,34 @@ export function canvasHighway(canvas: HTMLCanvasElement, kalimba: KalimbaHandle)
       }
 
       ctx.textBaseline = 'middle';
-      for (const note of session.upcoming()) {
-        const y = hitY - (note.beat - now) * PIXELS_PER_BEAT;
-        if (y < -NOTE_HEIGHT) break; // sorted by onset: the rest is further up
+      for (const note of session.inView()) {
+        const y = hitY - (note.beat - now) * PIXELS_PER_BEAT; // its head's middle meets the line as it's struck
+        const shape = noteShape(note.beats);
+        const foot = y + shape.head / 2;
+        const end = foot - shape.length;
+        if (foot < 0) break; // sorted by onset: the rest is further up
         const lane = lanes[note.tongue.index];
-        const fill = note.fit === 'exact' ? colours.exact : colours.folded;
-        const tail = note.beats * PIXELS_PER_BEAT - NOTE_HEIGHT / 2;
-        ctx.globalAlpha = 0.35;
-        ctx.fillStyle = fill;
-        if (tail > 0) ctx.fillRect(lane.centre - 2, y - tail, 4, tail);
-        ctx.globalAlpha = 1;
+        const struck = note.beat < now;
+        ctx.fillStyle = note.fit === 'exact' ? colours.exact : colours.folded;
+        // the held part, lighter, narrower, above the head; struck, it sinks into the line as it sounds
+        const heldFoot = struck ? hitY : foot - shape.head;
+        if (heldFoot > end) {
+          ctx.globalAlpha = 0.45;
+          ctx.beginPath();
+          ctx.roundRect(lane.centre - lane.width * 0.3, end, lane.width * 0.6, heldFoot - end, [6, 6, 0, 0]);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        if (struck) continue;
         ctx.beginPath();
-        ctx.roundRect(lane.centre - lane.width * 0.45, y - NOTE_HEIGHT / 2, lane.width * 0.9, NOTE_HEIGHT, 6);
+        ctx.roundRect(lane.centre - lane.width * 0.45, foot - shape.head, lane.width * 0.9, shape.head, 6);
         ctx.fill();
-        drawNoteLabel(ctx, note.tongue, lane.centre, y, note.fit === 'exact' ? ink.exact : ink.folded);
+        const noteInk = note.fit === 'exact' ? ink.exact : ink.folded;
+        if (shape.label === 'full') drawNoteLabel(ctx, note.tongue, lane.centre, y, noteInk);
+        else {
+          const { above, below } = tongueNumberParts(note.tongue);
+          drawMarked(ctx, note.tongue.letter, above, below, lane.centre, y, noteInk, note.tongue.accidental);
+        }
       }
     },
   };

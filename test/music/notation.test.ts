@@ -145,6 +145,22 @@ describe('source positions', () => {
   });
 });
 
+describe('marks: every played part of the text, in order', () => {
+  const marks = (text: string) => parseSong(text).marks.map((m) => [text.slice(m.source.start, m.source.end), m.beat, m.beats]);
+
+  it('has a note, a hold and a rest each where it is written, with its beat and length', () => {
+    expect(marks('C4_ D4 - 0 E4')).toEqual([['C4_', 0, 0.5], ['D4', 0.5, 1], ['-', 1.5, 1], ['0', 2.5, 1], ['E4', 3.5, 1]]);
+  });
+
+  it('marks a hold glued to its note, and a group once', () => {
+    expect(marks('2-4 [C4 E4]_')).toEqual([['2', 0, 1], ['-', 1, 1], ['4', 2, 1], ['[C4 E4]_', 3, 0.5]]);
+  });
+
+  it('keeps rests of any length', () => {
+    expect(marks('C4 0_. 0 -')).toEqual([['C4', 0, 1], ['0_.', 1, 0.75], ['0', 1.75, 1], ['-', 2.75, 1]]);
+  });
+});
+
 describe('numbers name tongues', () => {
   const raised = (...notes: string[]) => retune(KALIMBA_21, KALIMBA_21.map((t) => (notes.includes(t.note) ? 1 : 0)));
   const midis = (text: string, notes: string[]) => parseSong(text, { tongues: raised(...notes) }).notes.map((n) => n.midi);

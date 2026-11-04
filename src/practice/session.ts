@@ -114,6 +114,13 @@ export class PracticeSession {
     return this.pending;
   }
 
+  /** What the falling notes show: what's still to play and, while time runs, what still sounds, held. */
+  inView(): readonly ArrangedNote[] {
+    if (this.mode === 'wait') return this.pending; // time stands: nothing sounds by itself
+    const sounding = this.arrangement.notes.filter((n) => n.beat <= this.now && this.now < n.beat + n.beats && !this.pending.includes(n));
+    return [...sounding, ...this.pending];
+  }
+
   private currentStep(): ArrangedNote[] {
     const first = this.pending[0];
     return first ? this.pending.filter((n) => n.beat === first.beat) : [];

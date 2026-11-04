@@ -1,13 +1,14 @@
 import type { PracticeSong } from '../practice/practice-view';
 
 // the built-in songs: the owner's choice, their responsibility (CLAUDE.md, Songs); anything else is pasted in by the player
+// each note as long as it sounds in its MIDI, a rest (0) where it falls silent
 
 // converted from Carlo Prato's MIDI (cprato.com): at each onset the tune, its bass and one note between, each to the next onset
 const SWEDEN = `title: Sweden (C418)
 tempo: 88
 meter: 4/4
 key: D
-// aus der MIDI von Carlo Prato (cprato.com): Melodie, Bass und ein Ton dazwischen
+// aus der MIDI von Carlo Prato (cprato.com): Melodie, Bass und ein Ton dazwischen; Pausen wie in der MIDI
 [B2 E3 G3] - [F#3 A4] B4
 [A2 D4 F#4] - B2 D4_ E4_
 [A3 C#4 F#4] - G3 F#3_ A3_
@@ -29,7 +30,7 @@ A4 - - -
 const HAGGSTROM = `title: Haggstrom (C418)
 tempo: 112
 meter: 7/4
-// aus einer MIDI-Fassung: die beiden Kalimba-Spuren, erster Teil; Melodie, Bass und ein Ton dazwischen
+// aus einer MIDI-Fassung: die beiden Kalimba-Spuren, erster Teil; Melodie, Bass und ein Ton dazwischen; Pausen wie in der MIDI
 [G4 C5] D4 C4 [G4 C5] D4 C4 A4
 [G4 C5] D4 C4 [G4 C5] D4 C4 -
 [G4 C5] D4 C4 [G4 C5] D4 C4 A4
@@ -59,28 +60,28 @@ meter: 7/4
 const MINECRAFT = `title: Minecraft (C418)
 tempo: 120
 meter: 4/4
-// aus einer MIDI-Fassung (MIDIfind.com): Melodie, Bass und ein Ton dazwischen
-[F#3 A#3] - G#3 D#3 -
+// aus einer MIDI-Fassung (MIDIfind.com): Melodie, Bass und ein Ton dazwischen; Pausen wie in der MIDI
+[F#3 A#3] - G#3 D#3 0
 [A#2 F#3] - -
-[F#3 A#3] - G#3 D#3 -
+[F#3 A#3] - G#3 D#3 0
 C#3 - -
-[F#3 A#3] - G#3 D#3 -
+[F#3 A#3] - G#3 D#3 0
 [A#2 F#3] - -
-[F#3 A#3] - G#3 D#3 -
+[F#3 A#3] - G#3 D#3 0
 C#3 - -
 [F#3 A#3] - G#3 D#3
 F#3 C#3 - A#2
-[F#3 A#3] - C#3 D#3 -
+[F#3 A#3] - C#3 D#3 0
 [A#2 F#3] - [C#3 G#3]
-[F#3 A#3] - G#3 [D#3 A#3] -
+[F#3 A#3] - G#3 [D#3 A#3] 0
 C#4 - -
-[F#3 A#3] - [G#3 C#4] D#4 -
+[F#3 A#3] - [G#3 C#4] D#4 0
 [G#3 C#4] A#3 G#3
-[F#3 A#3] - G#3 [D#3 A#3] -
+[F#3 A#3] - G#3 [D#3 A#3] 0
 F#3 - -
-C#3 - - D#3 -
-[A#2 F#3] - -
-[C#3 G#3] - A#3 F#3 -
+C#3 - - D#3 0
+[A#2 F#3] - 0
+[C#3 G#3] - A#3 F#3 0
 C#3 - -
 [A2 C#3] - - -
 [G2 B2] - - -
@@ -95,11 +96,11 @@ B2 - - -`;
 const WET_HANDS = `title: Wet Hands (C418)
 tempo: 72
 meter: 4/4
-// aus einer MIDI-Fassung (MIDIfind.com): Melodie, Bass und ein Ton dazwischen
+// aus einer MIDI-Fassung (MIDIfind.com): Melodie, Bass und ein Ton dazwischen; Pausen wie in der MIDI
 A2_ E3_ A3_ B3_ C#4_ B3_ A3_ E3_
-D3_ A3_ C#4_ E4_ C#4_ A3.
+D3_ A3_ C#4_ E4_ C#4_ A3_ 0
 A2_ E3_ A3_ B3_ C#4_ B3_ A3_ E3_
-D3_ A3_ C#4_ E4_ C#4_ A3.
+D3_ A3_ C#4_ E4_ C#4_ A3_ 0
 [A2 G#4]_ E3_ A3_ E3_ A2_ E3_ A4_ A3_
 [D3 F#4]_ A3_ C#4_ A3_ D3_ A3_ E4_ F#4_
 [A2 G#4]_ E3_ A3_ E3_ A2_ E3_ B3_ C#4_
@@ -120,7 +121,7 @@ E2_ B2_ E3_ G#3_ B3_ G#3_ B2
 A2_ E4_ E3_ A3_ A4_ C#4_ A3_ E3_
 [E2 G#4]_ [B2 E4]_ [E3 B3]_ [B2 G#3]_ [E2 E3] -
 [E2 B3]_ [B2 G#3]_ [B2 E3]_ B2_ [E2 B2 E3] -
-E2_ E3_ G#3_ E4_ B3_ G#3.
+E2_ E3_ G#3_ E4_ B3_ G#3_ 0
 E2_ E3_ G#3_ E4_ B3_ G#3_`;
 
 export const SONGS: readonly PracticeSong[] = [
