@@ -6,24 +6,6 @@ import { KLANG_STORAGE_KEY, parseStoredKlang, type KlangValues } from './sound/k
 import { mountKlangPanel } from './sound/klang-panel';
 import { ModularPlayer } from './sound/player';
 import { SongPlayer } from './practice/song-player';
-import { parseStoredTuning, TUNING_STORAGE_KEY } from './stored-tuning';
-
-// storage may be blocked (private window, previews): the kalimba then starts in standard tuning
-function loadTuning(): number[] | undefined {
-  try {
-    return parseStoredTuning(localStorage.getItem(TUNING_STORAGE_KEY), KALIMBA_21.length);
-  } catch {
-    return undefined;
-  }
-}
-
-function saveTuning(halfSteps: readonly number[]): void {
-  try {
-    localStorage.setItem(TUNING_STORAGE_KEY, JSON.stringify(halfSteps));
-  } catch {
-    // not remembered; this session still has it
-  }
-}
 
 function loadKlang(): KlangValues {
   try {
@@ -42,18 +24,15 @@ function saveKlang(values: KlangValues): void {
 }
 
 const klang = loadKlang();
-const sound = new ModularPlayer(klang, retune(KALIMBA_21, loadTuning() ?? KALIMBA_21.map(() => 0)));
+// a retuning lasts the visit: each starts in the standard tuning
+const sound = new ModularPlayer(klang, KALIMBA_21);
 const app = document.querySelector<HTMLElement>('#app')!;
 const practice = mountPractice(app, {
   tongues: KALIMBA_21,
   sound,
   songs: SONGS,
   highway: canvasHighway,
-  tuning: loadTuning(),
-  onTuningChange: (halfSteps) => {
-    saveTuning(halfSteps);
-    sound.setTongues(retune(KALIMBA_21, halfSteps));
-  },
+  onTuningChange: (halfSteps) => sound.setTongues(retune(KALIMBA_21, halfSteps)),
   metronome: sound,
   // listening and playing along: the song on the clock, as stim-garden's clip player plays a clip, its notes and clicks ahead of time
   songPlayer: new SongPlayer(sound),

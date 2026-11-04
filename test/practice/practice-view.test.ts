@@ -268,6 +268,19 @@ describe('mountPractice', () => {
     });
   });
 
+  it('marks the controls as playing while a song runs, so start is lit then and stop while stopped', () => {
+    const { q, set, start, view } = setup();
+    const playing = () => q('.controls').classList.contains('playing');
+    set('mode', 'wait');
+    set('text', 'C4');
+    expect(playing()).toBe(false);
+    start();
+    view.tick(0.1);
+    expect(playing()).toBe(true);
+    q<HTMLButtonElement>('[name="stop"]').click();
+    expect(playing()).toBe(false);
+  });
+
   describe('the loop', () => {
     it('is a toggle beside the click, labelled Schleife, on to start', () => {
       const { q } = setup();

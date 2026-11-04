@@ -139,7 +139,8 @@ button { font: inherit; cursor: pointer; }
   font-weight: 600;
 }
 .controls button:hover, .song-strip button:hover, .import-row button:hover { border-color: var(--accent-soft); }
-.controls button[name="start"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 4px 14px var(--glow); }
+/* lit as a transport's lamps: start while a song plays, stop while stopped */
+.controls.playing button[name="start"], .controls:not(.playing) button[name="stop"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 4px 14px var(--glow); }
 
 /* playing: one row on a laptop, song to Start; it wraps on narrower screens */
 .controls { display: flex; flex-wrap: wrap; gap: 12px 12px; align-items: flex-end; }

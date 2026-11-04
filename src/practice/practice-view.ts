@@ -277,6 +277,8 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const meterSelect = field<HTMLSelectElement>('meter');
   const clickBox = field<HTMLInputElement>('click');
   const loopBox = field<HTMLInputElement>('loop');
+  // while a song runs, stop is the button lit, not start
+  const controls = panel.querySelector<HTMLElement>('.controls')!;
   const textArea = field<HTMLTextAreaElement>('text');
   const error = panel.querySelector<HTMLElement>('.error:not(.editor-error)')!;
   const editorError = panel.querySelector<HTMLElement>('.editor-error')!;
@@ -342,6 +344,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
 
   const refresh = () => {
     const running = session !== undefined && !session.finished;
+    controls.classList.toggle('playing', running);
     kalimba.setTargets(running ? session!.targets() : []);
     if (session) status.textContent = [fit, describeScore(session)].filter(Boolean).join(' — ');
     highlight(running ? session!.currentNotes() : []);
@@ -490,6 +493,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     session = undefined;
     kalimba.setTargets([]);
     highlight([]);
+    controls.classList.remove('playing');
   };
 
   const beatsPerMinute = () => Number(tempoInput.value);
