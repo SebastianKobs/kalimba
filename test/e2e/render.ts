@@ -3,6 +3,7 @@
 import type { Message } from '../../libs/midi/protocol/index.ts';
 import { KALIMBA_21, retune } from '../../src/layout';
 import { KalimbaSound } from '../../src/sound/kalimba-sound';
+import { masterInto } from '../../src/sound/master';
 import { DEFAULT_KLANG, type KlangValues } from '../../src/sound/klang';
 import type { ArrangedNote } from '../../src/music/arrange';
 import { SongPlayer, type ScheduledSound } from '../../src/practice/song-player';
@@ -20,6 +21,8 @@ export interface RenderAsk {
   readonly klang?: Partial<KlangValues>;
   /** half steps per tongue, as the Umstimmen mode retunes them */
   readonly tuning?: readonly number[];
+  /** through the player's master: its level into the limiter, as it reaches the speaker */
+  readonly master?: boolean;
 }
 
 // mulberry32: a seeded draw in [0, 1)
@@ -38,7 +41,8 @@ async function renderKalimba(ask: RenderAsk): Promise<number[]> {
   const context = new OfflineAudioContext(1, Math.round(ask.seconds * sampleRate), sampleRate);
   const klang: KlangValues = { ...DEFAULT_KLANG, ...ask.klang };
   const tongues = retune(KALIMBA_21, ask.tuning ?? KALIMBA_21.map(() => 0));
-  const sound = new KalimbaSound({ context, into: context.destination, random: seeded(ask.seed ?? 1), klang, tongues });
+  const into = ask.master ? masterInto(context, context.destination) : context.destination;
+  const sound = new KalimbaSound({ context, into, random: seeded(ask.seed ?? 1), klang, tongues });
   for (const { note, t, velocity } of ask.plucks ?? []) {
     sound.pluck(tongues.find((tongue) => tongue.note === note)!, t, velocity ?? 1);
   }

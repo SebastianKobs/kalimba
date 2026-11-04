@@ -347,3 +347,22 @@ test('the metronome clicks short, the first beat of a bar higher and louder', as
   expect(peak(0, 0.1)).toBeGreaterThan(1.5 * peak(0.5, 0.6));
   expect(peak(0.15, 0.45)).toBeLessThan(peak(0, 0.1) / 100);
 });
+
+test.describe('the master', () => {
+  const peakDb = (s: readonly number[]) => db(Math.max(...s.map(Math.abs)));
+  const chord = (notes: string[]) => notes.map((note) => ({ note, t: 0.05, velocity: 1 }));
+
+  test('holds the loudest chords under full scale, as stim-garden’s Limiter on the master: nothing clips', async ({ page }) => {
+    // three notes with a bass, the converted songs' fullest, struck as hard as a pluck goes
+    const loud = await render(page, { seconds: 1.5, plucks: chord(['F3', 'A3', 'C4', 'F4', 'C5', 'E5']), master: true });
+    expect(peakDb(loud)).toBeLessThan(0);
+  });
+
+  test('leaves a note’s ringing at the master level: the limiter holds only what goes past its ceiling', async ({ page }) => {
+    const through = await render(page, { seconds: 1.5, plucks: chord(['C4']), master: true });
+    const raw = await render(page, { seconds: 1.5, plucks: chord(['C4']) });
+    // the ringing, after the onset Web Audio's compressor softens (as the sound was tuned): the master level's −6 dB, nothing more
+    const ringing = (s: readonly number[]) => db(rms(s, at(0.4), at(1)));
+    expect(ringing(through) - (ringing(raw) - 6)).toBeCloseTo(0, 0);
+  });
+});

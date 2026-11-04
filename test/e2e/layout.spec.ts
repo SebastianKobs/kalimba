@@ -1,9 +1,17 @@
 import { expect, test } from '@playwright/test';
 
-test('the page fits a phone: nothing scrolls sideways, not even the longest transposition', async ({ page }) => {
-  await page.setViewportSize({ width: 420, height: 900 });
-  await page.goto('/');
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(420);
+test('the page fits a phone, iPhones down to the smallest: nothing scrolls sideways, the kalimba inside the margins', async ({ page }) => {
+  for (const width of [320, 375, 390, 393, 420]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/');
+    const fit = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      kalimba: document.querySelector('.kalimba')!.getBoundingClientRect().toJSON(),
+    }));
+    expect(fit.scroll, `at ${width} px`).toBeLessThanOrEqual(width);
+    expect(fit.kalimba.left, `at ${width} px`).toBeGreaterThanOrEqual(16);
+    expect(fit.kalimba.right, `at ${width} px`).toBeLessThanOrEqual(width - 16);
+  }
 });
 
 test('on a laptop screen the controls are one row, and the kalimba fits under them without scrolling', async ({ page }) => {

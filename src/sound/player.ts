@@ -2,11 +2,11 @@ import type { Plucker } from '../kalimba-view';
 import type { Tongue } from '../layout';
 import type { ScheduledSound } from '../practice/song-player';
 import type { KlangValues } from './klang';
+import { masterInto } from './master';
 import { KalimbaSound } from './kalimba-sound';
 
 // a pluck is never quite as hard as the last: velocity drawn in this range
 const VELOCITY = [0.85, 1] as const;
-const MASTER_LEVEL = 0.5; // headroom for chords, into the limiter
 
 interface Running {
   readonly context: AudioContext;
@@ -77,13 +77,7 @@ export class ModularPlayer implements Plucker, ScheduledSound {
       return this.#running;
     }
     const context = new AudioContext({ latencyHint: 'interactive' });
-    const level = context.createGain();
-    level.gain.value = MASTER_LEVEL;
-    const limiter = context.createDynamicsCompressor();
-    limiter.threshold.value = -6;
-    limiter.ratio.value = 12;
-    level.connect(limiter).connect(context.destination);
-    const sound = new KalimbaSound({ context, into: level, random: Math.random, klang: this.#klang, tongues: this.#tongues });
+    const sound = new KalimbaSound({ context, into: masterInto(context, context.destination), random: Math.random, klang: this.#klang, tongues: this.#tongues });
     this.#running = { context, sound };
     return this.#running;
   }

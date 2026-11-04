@@ -305,7 +305,8 @@ button { font: inherit; cursor: pointer; }
 }
 
 .tongue {
-  width: clamp(14px, 3.4vw, 34px);
+  /* the 21 share what the screen leaves (its 16 px margins, the body's sides, the gaps): an iPhone's 375 px holds them all */
+  width: clamp(10px, calc((100vw - 34px - 2 * var(--side) - 20 * var(--gap)) / 21), 34px); /* 2 px to spare: browsers round differently */
   height: calc(var(--max-tongue) * var(--length));
   border: none;
   border-radius: 2px 2px 40% 40% / 2px 2px 10px 10px;
