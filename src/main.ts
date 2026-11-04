@@ -1,12 +1,27 @@
 import './style.css';
 import { WebAudioPlucker } from './audio';
-import { mountKalimba } from './kalimba-view';
 import { KALIMBA_21 } from './layout';
+import { canvasHighway } from './practice/highway';
+import { mountPractice } from './practice/practice-view';
+import { SONGS } from './songs';
 
-const plucker = new WebAudioPlucker();
-mountKalimba(document.querySelector<HTMLElement>('#app')!, KALIMBA_21, plucker);
+const sound = new WebAudioPlucker();
+const practice = mountPractice(document.querySelector<HTMLElement>('#app')!, {
+  tongues: KALIMBA_21,
+  sound,
+  songs: SONGS,
+  highway: canvasHighway,
+});
 
 // audio may only start after a user gesture; render all tines on the first one
-const prepareOnce = () => plucker.prepare(KALIMBA_21);
+const prepareOnce = () => sound.prepare(KALIMBA_21);
 document.addEventListener('pointerdown', prepareOnce, { once: true });
 document.addEventListener('keydown', prepareOnce, { once: true });
+
+let last = performance.now();
+const frame = (now: number) => {
+  practice.tick(Math.min(0.1, (now - last) / 1000)); // cap: a background tab must not skip the song
+  last = now;
+  requestAnimationFrame(frame);
+};
+requestAnimationFrame(frame);

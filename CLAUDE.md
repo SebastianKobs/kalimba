@@ -33,15 +33,25 @@ Core logic is pure and tested in Node. Edges are thin.
 
 | File | Role |
 |---|---|
-| `src/pitch.ts` | note name → MIDI number → frequency (12-TET, A4 = 440 Hz) |
-| `src/layout.ts` | `KALIMBA_21`: the card's tongues with cipher digit, octave dots and length (L ∝ 1/√f) |
+| `src/pitch.ts` | note name (with # or b) → MIDI number → frequency (12-TET, A4 = 440 Hz) |
+| `src/layout.ts` | `createTongues`, `KALIMBA_21` (the card), `KALIMBA_17`: tongues with cipher digit, octave dots and length (L ∝ 1/√f) |
+| `src/music/notation.ts` | `parseSong`: song text (note names or kalimba numbers, jianpu durations) → notes in beats; `SongTextError` for bad input |
+| `src/music/arrange.ts` | `arrange`: any song onto any tongues: best transposition, octave folding, skipped notes |
+| `src/practice/session.ts` | `PracticeSession`: clock and scoring in beats for listen, play-along and wait modes |
 | `src/synth.ts` | `renderTine`: frequency → mono samples (decaying sine modes, 2nd mode at 6.267×) |
 | `src/keymap.ts` | `KeyboardEvent.code` → tongue, in pitch order: `Z`…`/` then `A`…`'` |
 | `src/kalimba-view.ts` | edge: draws the tongues, maps pointer and keyboard input to `Plucker.pluck` |
 | `src/audio.ts` | edge: `WebAudioPlucker`, one voice per tongue, damps on re-pluck, limiter on the master |
-| `src/main.ts` | wires view and audio; renders all tines on the first user gesture |
+| `src/practice/practice-view.ts` | edge: song, mode and speed controls, status and errors, kalimba with targets |
+| `src/practice/highway.ts` | edge: canvas lane per tongue, notes falling onto the bridge |
+| `src/songs/index.ts` | built-in songs, public domain only |
+| `src/main.ts` | wires practice view, audio and the animation frame loop |
 
-Tests live in `test/`. The view test runs in jsdom with a fake plucker. `audio.ts` and drag-to-strum have no automated tests; they are checked by playing.
+Tests live in `test/`. The view tests run in jsdom with a fake plucker and no highway. `audio.ts`, `highway.ts` and drag-to-strum have no automated tests; they are checked by playing.
+
+## Songs
+
+Built-in songs are public domain. Copyrighted songs, such as C418's Minecraft music, are not transcribed into the repo: players paste their own tab into the song text field.
 
 ## Rule overrides
 - none yet

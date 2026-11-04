@@ -15,16 +15,11 @@ export interface Tongue {
   readonly lengthRatio: number;
 }
 
-// read off kalimba.jpg, left to right; lowest tongue in the centre
-const NOTES_LEFT_TO_RIGHT = [
-  'D6', 'B5', 'G5', 'E5', 'C5', 'A4', 'F4', 'D4', 'B3', 'G3',
-  'F3',
-  'A3', 'C4', 'E4', 'G4', 'B4', 'D5', 'F5', 'A5', 'C6', 'E6',
-];
 
 const CIPHER_DIGITS = 'CDEFGAB';
 
-function buildTongues(notes: string[]): Tongue[] {
+/** Tongues from their notes, left to right. */
+export function createTongues(notes: readonly string[]): Tongue[] {
   const lowest = Math.min(...notes.map((n) => midiToFrequency(parseNote(n))));
   return notes.map((note, index) => {
     const midi = parseNote(note);
@@ -44,4 +39,16 @@ function buildTongues(notes: string[]): Tongue[] {
   });
 }
 
-export const KALIMBA_21: readonly Tongue[] = buildTongues(NOTES_LEFT_TO_RIGHT);
+// read off kalimba.jpg, left to right; lowest tongue in the centre
+export const KALIMBA_21: readonly Tongue[] = createTongues([
+  'D6', 'B5', 'G5', 'E5', 'C5', 'A4', 'F4', 'D4', 'B3', 'G3',
+  'F3',
+  'A3', 'C4', 'E4', 'G4', 'B4', 'D5', 'F5', 'A5', 'C6', 'E6',
+]);
+
+// the common 17-tongue C kalimba: the 21's layout without its four lowest notes
+export const KALIMBA_17: readonly Tongue[] = createTongues([
+  'D6', 'B5', 'G5', 'E5', 'C5', 'A4', 'F4', 'D4',
+  'C4',
+  'E4', 'G4', 'B4', 'D5', 'F5', 'A5', 'C6', 'E6',
+]);

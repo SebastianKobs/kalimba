@@ -5,6 +5,17 @@ export interface Plucker {
   pluck(tongue: Tongue): void;
 }
 
+export interface KalimbaHandle {
+  /** pluck as if by finger: sound through the plucker, plus the visual */
+  pluck(tongue: Tongue): void;
+  /** light up the tongues to play next; replaces the previous targets */
+  setTargets(tongues: readonly Tongue[]): void;
+  markMiss(tongue: Tongue): void;
+  /** the tongue elements, left to right, for aligning things with them */
+  readonly tongueElements: readonly HTMLElement[];
+  unmount(): void;
+}
+
 const DOT = '•';
 
 function keyLabel(code: string): string {
@@ -31,14 +42,18 @@ function renderTongue(tongue: Tongue): HTMLElement {
   return el;
 }
 
-function flash(el: HTMLElement): void {
-  el.classList.remove('plucked');
-  void el.offsetWidth; // restart the CSS animation on re-pluck
-  el.classList.add('plucked');
+function isTyping(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"]') !== null;
 }
 
-/** Draws the tongues into root and wires pointer + keyboard input to the plucker. Returns unmount. */
-export function mountKalimba(root: HTMLElement, tongues: readonly Tongue[], plucker: Plucker): () => void {
+function flash(el: HTMLElement, className: string): void {
+  el.classList.remove(className);
+  void el.offsetWidth; // restart the CSS animation on re-pluck
+  el.classList.add(className);
+}
+
+/** Draws the tongues into root and wires pointer + keyboard input to the plucker. */
+export function mountKalimba(root: HTMLElement, tongues: readonly Tongue[], plucker: Plucker): KalimbaHandle {
   const doc = root.ownerDocument;
   const board = doc.createElement('div');
   board.className = 'kalimba';
@@ -48,7 +63,7 @@ export function mountKalimba(root: HTMLElement, tongues: readonly Tongue[], pluc
 
   const pluck = (tongue: Tongue) => {
     plucker.pluck(tongue);
-    flash(elements[tongue.index]);
+    flash(elements[tongue.index], 'plucked');
   };
   const tongueAt = (target: EventTarget | null): Tongue | undefined => {
     const el = target instanceof Element ? target.closest<HTMLElement>('.tongue') : null;
@@ -74,7 +89,7 @@ export function mountKalimba(root: HTMLElement, tongues: readonly Tongue[], pluc
   };
   const onPointerUp = (e: PointerEvent) => lastTongue.delete(e.pointerId);
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
     const tongue = tongueForKey(e.code);
     if (!tongue) return;
     e.preventDefault();
@@ -87,11 +102,20 @@ export function mountKalimba(root: HTMLElement, tongues: readonly Tongue[], pluc
   doc.addEventListener('pointercancel', onPointerUp);
   doc.addEventListener('keydown', onKeyDown);
 
-  return () => {
-    doc.removeEventListener('pointermove', onPointerMove);
-    doc.removeEventListener('pointerup', onPointerUp);
-    doc.removeEventListener('pointercancel', onPointerUp);
-    doc.removeEventListener('keydown', onKeyDown);
-    board.remove();
+  return {
+    pluck,
+    setTargets(targets) {
+      const wanted = new Set(targets.map((t) => t.index));
+      elements.forEach((el, i) => el.classList.toggle('target', wanted.has(i)));
+    },
+    markMiss: (tongue) => flash(elements[tongue.index], 'miss'),
+    tongueElements: elements,
+    unmount() {
+      doc.removeEventListener('pointermove', onPointerMove);
+      doc.removeEventListener('pointerup', onPointerUp);
+      doc.removeEventListener('pointercancel', onPointerUp);
+      doc.removeEventListener('keydown', onKeyDown);
+      board.remove();
+    },
   };
 }
