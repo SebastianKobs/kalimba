@@ -1,5 +1,5 @@
 import { keyForTongue, tongueForKey } from '../src/keymap';
-import { KALIMBA_21 } from '../src/layout';
+import { KALIMBA_21, retune } from '../src/layout';
 
 describe('keymap', () => {
   it('plays pitches upward along the bottom row, then the home row', () => {
@@ -17,5 +17,12 @@ describe('keymap', () => {
 
   it('ignores keys outside the map', () => {
     expect(tongueForKey('Space')).toBeUndefined();
+  });
+
+  it('keeps a retuned tongue on its key', () => {
+    const tuned = retune(KALIMBA_21, KALIMBA_21.map((t) => (t.note === 'F3' ? 1 : 0)));
+    const f3 = tongueForKey('KeyZ', tuned)!;
+    expect(f3.note).toBe('F#3');
+    expect(keyForTongue(f3)).toBe('KeyZ');
   });
 });

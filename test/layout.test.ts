@@ -1,4 +1,4 @@
-import { KALIMBA_21 } from '../src/layout';
+import { KALIMBA_21, retune } from '../src/layout';
 
 // read off kalimba.jpg, left to right
 const CARD = [
@@ -33,5 +33,30 @@ describe('KALIMBA_21', () => {
     for (let i = 1; i < byPitch.length; i++) {
       expect(byPitch[i].lengthRatio).toBeLessThan(byPitch[i - 1].lengthRatio);
     }
+  });
+});
+
+describe('retune', () => {
+  const offsets = (changes: Record<string, number>) => KALIMBA_21.map((t) => changes[t.note] ?? 0);
+
+  it('raises tongues by a half step, like a C kalimba with its F tongues raised', () => {
+    const tuned = retune(KALIMBA_21, offsets({ F3: 1, F4: 1, F5: 1 }));
+    const f4 = tuned.find((t) => t.index === KALIMBA_21.findIndex((k) => k.note === 'F4'))!;
+    expect(f4.note).toBe('F#4');
+    expect(f4.midi).toBe(66);
+    expect(f4.frequency).toBeCloseTo(369.99, 2);
+    expect([f4.letter, f4.accidental, f4.cipher, f4.octaveDots, f4.tuning]).toEqual(['F', '#', 4, 0, 1]);
+    expect(tuned.map((t) => t.note).filter((n) => n.includes('#'))).toEqual(['F#4', 'F#3', 'F#5']);
+  });
+
+  it('lowers tongues by a half step', () => {
+    const b3 = retune(KALIMBA_21, offsets({ B3: -1 })).find((t) => t.letter === 'B' && t.octaveDots === -1)!;
+    expect([b3.note, b3.midi, b3.accidental]).toEqual(['Bb3', 58, 'b']);
+  });
+
+  it('keeps each tongue in its place and length', () => {
+    const tuned = retune(KALIMBA_21, offsets({ C4: 1, E6: -1 }));
+    expect(tuned.map((t) => [t.index, t.lengthRatio])).toEqual(KALIMBA_21.map((t) => [t.index, t.lengthRatio]));
+    expect(retune(KALIMBA_21, offsets({})).map((t) => t.note)).toEqual(KALIMBA_21.map((t) => t.note));
   });
 });

@@ -1,5 +1,6 @@
 import { mountKalimba, type KalimbaHandle, type Plucker } from '../kalimba-view';
-import type { Tongue } from '../layout';
+import { retune, type Tongue } from '../layout';
+import { describeTuning } from '../tuning';
 import { arrange, transposeOptions, type Arrangement, type TransposeOption } from '../music/arrange';
 import { describeShift } from '../music/interval';
 import { DEFAULT_TEMPO, keyOf, parseSong, SongTextError, tempoOf, titleOf, type IgnoredText } from '../music/notation';
@@ -22,6 +23,9 @@ export interface PracticeConfig {
   readonly sound: Plucker;
   readonly songs: readonly PracticeSong[];
   readonly highway: HighwayFactory;
+  /** half steps per tongue, -1, 0 or 1; validated by the caller */
+  readonly tuning?: readonly number[];
+  onTuningChange?(halfSteps: readonly number[]): void;
 }
 
 export interface PracticeView {
@@ -80,6 +84,11 @@ function controlsMarkup(songs: readonly PracticeSong[]): string {
         <details class="help"><summary>Tab format</summary><p>${FORMAT_HELP}</p></details>
       </div>
     </div>
+    <div class="tuning-row">
+      <button type="button" name="retune" aria-pressed="false">Retune</button>
+      <button type="button" name="retune-reset">Reset tuning</button>
+      <span class="tuning"></span>
+    </div>
     <p class="status" role="status"></p>
     <p class="skipped"></p>
     <p class="error" role="alert"></p>`;
@@ -110,6 +119,8 @@ function describeOption(option: TransposeOption, best: boolean): string {
   return parts.join(' · ');
 }
 
+// a tap in retune mode: natural → sharp → flat → natural
+const NEXT_TUNING: Record<number, number> = { 0: 1, 1: -1, [-1]: 0 };
 const SKIPPED_SHOWN = 6;
 const SKIPPED_TEXT_LENGTH = 40;
 
@@ -160,17 +171,27 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const nameInput = field<HTMLInputElement>('import-name');
   const keySelect = field<HTMLSelectElement>('import-key');
   const transposeSelect = field<HTMLSelectElement>('transpose');
+  const retuneButton = field<HTMLButtonElement>('retune');
+  const tuningText = panel.querySelector<HTMLElement>('.tuning')!;
   let session: PracticeSession | undefined;
   let fit = '';
+  let halfSteps = config.tongues.map((_, i) => config.tuning?.[i] ?? 0);
+  let tongues = retune(config.tongues, halfSteps);
+  let retuning = false;
 
-  const kalimba = mountKalimba(stage, config.tongues, {
-    pluck(tongue) {
-      config.sound.pluck(tongue);
-      if (!session || session.finished) return;
-      if (session.pluck(tongue) === 'miss') kalimba.markMiss(tongue);
-      refresh();
+  const kalimba = mountKalimba(
+    stage,
+    tongues,
+    {
+      pluck(tongue) {
+        config.sound.pluck(tongue);
+        if (!session || session.finished) return;
+        if (session.pluck(tongue) === 'miss') kalimba.markMiss(tongue);
+        refresh();
+      },
     },
-  });
+    { onRetune: (tongue) => retuneTongue(tongue.index) },
+  );
   const highway = config.highway(canvas, kalimba);
 
   const refresh = () => {
@@ -189,7 +210,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const offerTranspositions = () => {
     let options: TransposeOption[] = [];
     try {
-      options = transposeOptions(parseSong(textArea.value), config.tongues);
+      options = transposeOptions(parseSong(textArea.value, { tongues }), tongues);
     } catch (e) {
       if (!(e instanceof SongTextError)) throw e;
     }
@@ -230,7 +251,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     // the tuning goes into the text as a key line, so it stays visible and editable
     const text = keySelect.value && !keyOf(textArea.value) ? `key: ${keySelect.value}\n${textArea.value}` : textArea.value;
     try {
-      const parsed = parseSong(text);
+      const parsed = parseSong(text, { tongues });
       songs.push({ title, text });
       textArea.value = text;
       keySelect.value = '';
@@ -252,10 +273,10 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const start = () => {
     clearMessages();
     try {
-      const song = parseSong(textArea.value);
+      const song = parseSong(textArea.value, { tongues });
       skipped.textContent = describeIgnored(song.ignored);
       const transpose = transposeSelect.value === '' ? undefined : Number(transposeSelect.value);
-      const arrangement = arrange(song, config.tongues, { transpose });
+      const arrangement = arrange(song, tongues, { transpose });
       session = new PracticeSession(arrangement, modeSelect.value as PracticeMode);
       // a title line in the text wins: it may be a built-in edited into something else
       fit = describeFit(titleOf(textArea.value) ?? selectedSong()?.title ?? song.title, arrangement);
@@ -283,9 +304,37 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   field<HTMLButtonElement>('start').addEventListener('click', start);
   field<HTMLButtonElement>('stop').addEventListener('click', stop);
   field<HTMLButtonElement>('import').addEventListener('click', importSong);
+  // a song fitted to the old tuning no longer fits: stop it and offer new transpositions
+  const applyTuning = (next: number[]) => {
+    halfSteps = next;
+    tongues = retune(config.tongues, halfSteps);
+    kalimba.setTongues(tongues);
+    stop();
+    offerTranspositions();
+    tuningText.textContent = tuningLine();
+    config.onTuningChange?.(halfSteps);
+  };
+
+  const retuneTongue = (index: number) => {
+    applyTuning(halfSteps.map((h, i) => (i === index ? NEXT_TUNING[h] : h)));
+    kalimba.pluck(tongues[index]); // hear the new pitch, like checking a tongue with a tuner
+  };
+
+  const tuningLine = () => (retuning ? `${describeTuning(tongues)} · tap a tongue: natural → # → b` : describeTuning(tongues));
+
+  const toggleRetuning = () => {
+    retuning = !retuning;
+    retuneButton.setAttribute('aria-pressed', String(retuning));
+    kalimba.setRetuning(retuning);
+    tuningText.textContent = tuningLine();
+  };
+
   nameInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') importSong();
   });
+  retuneButton.addEventListener('click', toggleRetuning);
+  field<HTMLButtonElement>('retune-reset').addEventListener('click', () => applyTuning(halfSteps.map(() => 0)));
+  tuningText.textContent = tuningLine();
   showSong();
 
   return {

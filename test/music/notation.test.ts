@@ -1,4 +1,5 @@
 import { parseSong, SongTextError, tempoOf, titleOf } from '../../src/music/notation';
+import { KALIMBA_21, retune } from '../../src/layout';
 
 const notes = (text: string) => parseSong(text).notes.map((n) => [n.beat, n.beats, n.midi]);
 
@@ -125,6 +126,28 @@ describe('parseSong', () => {
     it('skips a lyrics line whole, even when a word looks like a note', () => {
       expect(notes('A ma-zing grace\nVerse 1\nC')).toEqual([[0, 1, 60]]);
     });
+  });
+});
+
+describe('numbers name tongues', () => {
+  const raised = (...notes: string[]) => retune(KALIMBA_21, KALIMBA_21.map((t) => (notes.includes(t.note) ? 1 : 0)));
+  const midis = (text: string, notes: string[]) => parseSong(text, { tongues: raised(...notes) }).notes.map((n) => n.midi);
+
+  it('plays a number on its tongue as tuned: with 4′ raised, 4′ is F#5 and 4 stays F4', () => {
+    expect(midis('4′ 4 (4′-1′)', ['F5'])).toEqual([78, 65, 78, 72]);
+  });
+
+  it('leaves letters and note names as pitches', () => {
+    expect(midis('F′ F5', ['F5'])).toEqual([77, 77]);
+  });
+
+  it('lets a key line decide instead of the tongues, so the two never stack', () => {
+    expect(midis('key: C\n4′', ['F5'])).toEqual([77]);
+    expect(midis('key: G\n4′ 4', ['F5'])).toEqual([78, 66]);
+  });
+
+  it('lets a written accidental win', () => {
+    expect(midis('b4′', ['F5'])).toEqual([76]);
   });
 });
 

@@ -1,3 +1,4 @@
+import type { Tongue } from '../layout';
 import { keySignature, NO_KEY_SIGNATURE, type KeySignature } from './key';
 
 export interface SongNote {
@@ -57,27 +58,36 @@ function octaveShift(marks: string): number {
   return [...marks].reduce((sum, mark) => sum + shiftOf(mark), 0);
 }
 
-/** MIDI from the groups of PITCH: letter, accidental, octave, marks | accidental, digit, marks. An unmarked note takes the key's accidental. */
-function pitchFrom(groups: (string | undefined)[], key: KeySignature): number {
+/** What decides an unmarked note's accidental: the song's key line, or else the tongue a number names. */
+interface PitchContext {
+  readonly key: KeySignature;
+  /** base pitch → half steps that tongue is retuned by; only when the song has no key line */
+  readonly tongueTuning: ReadonlyMap<number, number>;
+}
+
+/** MIDI from the groups of PITCH: letter, accidental, octave, marks | accidental, digit, marks. */
+function pitchFrom(groups: (string | undefined)[], context: PitchContext): number {
   const [letter, letterAccidental, octave, letterMarks, digitAccidental, digit, digitMarks] = groups;
   const name = letter ?? CIPHER_TO_LETTER[Number(digit) - 1];
   const accidental = (letter ? letterAccidental : digitAccidental) ?? '';
   const baseOctave = octave === undefined ? 4 : Number(octave);
   const shift = octaveShift((letter ? letterMarks : digitMarks) ?? '');
-  const alteration = accidental === '#' ? 1 : accidental === 'b' ? -1 : (key.get(name) ?? 0);
-  const semitone = SEMITONES_FROM_C[CIPHER_TO_LETTER.indexOf(name)] + alteration;
-  return 12 * (baseOctave + shift + 1) + semitone;
+  const natural = 12 * (baseOctave + shift + 1) + SEMITONES_FROM_C[CIPHER_TO_LETTER.indexOf(name)];
+  // a number names a tongue: it sounds as that tongue is tuned; a letter names a pitch
+  const unmarked = context.key.get(name) ?? (letter ? 0 : (context.tongueTuning.get(natural) ?? 0));
+  const alteration = accidental === '#' ? 1 : accidental === 'b' ? -1 : unmarked;
+  return natural + alteration;
 }
 
 /** Chord content, joined by - or spaces, with ( ) or [ ] groups, or run together: "1-(5-7)", "1 3 5", "135". */
-function chordPitches(content: string, key: KeySignature): number[] | undefined {
+function chordPitches(content: string, context: PitchContext): number[] | undefined {
   const compact = content.replace(CHORD_JOINERS, '');
   const pitch = new RegExp(PITCH, 'y');
   const midis: number[] = [];
   while (pitch.lastIndex < compact.length) {
     const match = pitch.exec(compact);
     if (!match) return undefined;
-    midis.push(pitchFrom(match.slice(1), key));
+    midis.push(pitchFrom(match.slice(1), context));
   }
   return midis.length > 0 ? midis : undefined;
 }
@@ -96,14 +106,14 @@ function splitAtHolds(content: string): string[] {
 }
 
 /** A rest, a note, or a group ( ) or [ ] sounding together, each with its duration suffix. */
-function readOnset(part: string, key: KeySignature): Onset | undefined {
+function readOnset(part: string, context: PitchContext): Onset | undefined {
   const rest = REST.exec(part);
   if (rest) return { midis: [], beats: durationOf(rest[1]) };
   const single = SINGLE.exec(part);
-  if (single) return { midis: [pitchFrom(single.slice(1, 8), key)], beats: durationOf(single[8]) };
+  if (single) return { midis: [pitchFrom(single.slice(1, 8), context)], beats: durationOf(single[8]) };
   const [, group, duration] = /^(.*?)([_.]*)$/.exec(part)!;
   if (!GROUP.test(group)) return undefined;
-  const midis = chordPitches(group, key);
+  const midis = chordPitches(group, context);
   return midis && { midis, beats: durationOf(duration) };
 }
 
@@ -111,13 +121,13 @@ function readOnset(part: string, key: KeySignature): Onset | undefined {
  * What one token says, in order: onsets and holds. A - after a note holds it a beat longer,
  * whether it stands alone ("2 -") or the next note follows without a space ("2-4").
  */
-function readToken(token: string, key: KeySignature): (Onset | typeof HOLD)[] | undefined {
+function readToken(token: string, context: PitchContext): (Onset | typeof HOLD)[] | undefined {
   const items: (Onset | typeof HOLD)[] = [];
   const parts = splitAtHolds(token);
   for (const [i, part] of parts.entries()) {
     if (i > 0) items.push(HOLD);
     if (part === '') continue;
-    const onset = readOnset(part, key);
+    const onset = readOnset(part, context);
     if (!onset) return undefined;
     items.push(onset);
   }
@@ -184,10 +194,23 @@ function isMostlyNotes(readings: ((Onset | typeof HOLD)[] | undefined)[]): boole
  * Lines that are mostly not notes (page titles, lyrics, links) are skipped whole.
  * Throws SongTextError only when no notes are left.
  */
-export function parseSong(text: string): Song {
-  // a key signature holds for the whole song, wherever its line is
+export interface ParseOptions {
+  /** the kalimba as tuned now: a number in the song plays its tongue's pitch */
+  readonly tongues?: readonly Tongue[];
+}
+
+function tuningByBasePitch(tongues: readonly Tongue[]): Map<number, number> {
+  return new Map(tongues.filter((t) => t.tuning !== 0).map((t) => [t.midi - t.tuning, t.tuning]));
+}
+
+export function parseSong(text: string, options: ParseOptions = {}): Song {
+  // a key signature holds for the whole song, wherever its line is, and then decides over the tongues
   const keyName = keyOf(text);
-  const key = (keyName && keySignature(keyName)) || NO_KEY_SIGNATURE;
+  const signature = keyName ? keySignature(keyName) : undefined;
+  const context: PitchContext = {
+    key: signature ?? NO_KEY_SIGNATURE,
+    tongueTuning: signature ? new Map() : tuningByBasePitch(options.tongues ?? []),
+  };
   let title = 'Untitled';
   let beatsPerMinute = DEFAULT_TEMPO;
   const onsets: { beat: number; onset: Onset }[] = [];
@@ -211,7 +234,7 @@ export function parseSong(text: string): Song {
       return;
     }
     const tokens = line.match(TOKEN) ?? [];
-    const readings = tokens.map((t) => readToken(t.normalize('NFD'), key));
+    const readings = tokens.map((t) => readToken(t.normalize('NFD'), context));
     if (!isMostlyNotes(readings)) {
       ignored.push({ line: lineNumber, text: line.trim() });
       return;

@@ -13,6 +13,10 @@ export interface Tongue {
   readonly octaveDots: number;
   /** length relative to the longest tongue */
   readonly lengthRatio: number;
+  /** half steps this tongue is retuned by from its base note: -1, 0 or 1 */
+  readonly tuning: number;
+  /** '#' when raised, 'b' when lowered */
+  readonly accidental: '' | '#' | 'b';
 }
 
 
@@ -35,6 +39,8 @@ export function createTongues(notes: readonly string[]): Tongue[] {
       octaveDots: Number(note.slice(1)) - 4,
       // cantilever tine: f ∝ 1/L², so L ∝ 1/√f
       lengthRatio: Math.sqrt(lowest / frequency),
+      tuning: 0,
+      accidental: '',
     };
   });
 }
@@ -52,3 +58,24 @@ export const KALIMBA_17: readonly Tongue[] = createTongues([
   'C4',
   'E4', 'G4', 'B4', 'D5', 'F5', 'A5', 'C6', 'E6',
 ]);
+
+/**
+ * The same tongues, each raised (+1) or lowered (-1) by a half step, as by moving it in its bridge.
+ * Place, length and cipher digit stay: a retuned F is still tongue 4, now sounding F#.
+ */
+export function retune(tongues: readonly Tongue[], halfSteps: readonly number[]): Tongue[] {
+  return tongues.map((tongue, i) => {
+    const tuning = halfSteps[i] ?? 0;
+    const base = tongue.midi - tongue.tuning;
+    const accidental = tuning > 0 ? '#' : tuning < 0 ? 'b' : '';
+    const octave = tongue.note.slice(-1);
+    return {
+      ...tongue,
+      tuning,
+      accidental,
+      midi: base + tuning,
+      frequency: midiToFrequency(base + tuning),
+      note: `${tongue.letter}${accidental}${octave}`,
+    };
+  });
+}

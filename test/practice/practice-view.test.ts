@@ -7,12 +7,20 @@ const SONGS = [
   { title: 'Built-in two', text: 'title: Built-in two\nG4' },
 ];
 
-function setup() {
+function setup(tuning?: number[]) {
   const root = document.createElement('div');
   document.body.append(root);
   const sounded: string[] = [];
+  const savedTunings: number[][] = [];
   const sound = { pluck: (t: Tongue) => sounded.push(t.note) };
-  const view = mountPractice(root, { tongues: KALIMBA_21, sound, songs: SONGS, highway: () => ({ draw() {} }) });
+  const view = mountPractice(root, {
+    tongues: KALIMBA_21,
+    sound,
+    songs: SONGS,
+    highway: () => ({ draw() {} }),
+    tuning,
+    onTuningChange: (halfSteps) => savedTunings.push([...halfSteps]),
+  });
   const q = <T extends Element>(selector: string) => root.querySelector<T>(selector)!;
   const set = (name: string, value: string) => {
     const field = q<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(`[name="${name}"]`);
@@ -24,7 +32,7 @@ function setup() {
   const targets = () => [...root.querySelectorAll<HTMLElement>('.tongue.target')].map((t) => t.dataset.note);
   const press = (note: string) => tongue(note).dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
   const start = () => q<HTMLButtonElement>('[name="start"]').click();
-  return { root, view, sounded, q, set, tongue, targets, press, start };
+  return { root, view, sounded, savedTunings, q, set, tongue, targets, press, start };
 }
 
 afterEach(() => document.body.replaceChildren());
@@ -161,6 +169,69 @@ describe('mountPractice', () => {
       set('text', 'just words');
       expect(options(q)).toEqual([]);
       expect(q<HTMLSelectElement>('[name="transpose"]').disabled).toBe(true);
+    });
+  });
+
+  describe('retune', () => {
+    const F_TONGUES = ['F3', 'F4', 'F5'];
+    const raisedF = KALIMBA_21.map((t) => (F_TONGUES.includes(t.note) ? 1 : 0));
+    const notes = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('.tongue')].map((t) => t.dataset.note);
+
+    it('cycles a tapped tongue natural → sharp → flat → natural, playing each new pitch', () => {
+      const { q, root, sounded, savedTunings } = setup();
+      q<HTMLButtonElement>('[name="retune"]').click();
+      const f3 = () => root.querySelectorAll<HTMLElement>('.tongue')[10];
+      for (let i = 0; i < 3; i++) f3().dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      expect(sounded).toEqual(['F#3', 'Fb3', 'F3']);
+      expect(savedTunings.map((t) => t[10])).toEqual([1, -1, 0]);
+      expect(q('[name="retune"]').getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('starts from a saved tuning and says which tongues are retuned', () => {
+      const { root, q } = setup(raisedF);
+      expect(notes(root).filter((n) => n?.includes('#'))).toEqual(['F#4', 'F#3', 'F#5']);
+      expect(q('.tuning').textContent).toBe('Tuning: Standard C with 4\u0323, 4 and 4′ raised from F to F#');
+    });
+
+    it('fits songs to the retuned tongues: a G major tab plays as written with the F tongues raised', () => {
+      const { q, set, start, view } = setup(raisedF);
+      set('text', 'key: G\n1 4 1″ 3″');
+      expect(q<HTMLSelectElement>('[name="transpose"]').options[0].text).toBe('as written · best fit');
+      start();
+      view.tick(1);
+      expect(q('[role="status"]').textContent).toMatch(/· as written/);
+    });
+
+    it('plays a tab number on the tongue it names, as retuned', () => {
+      const onlyF5 = KALIMBA_21.map((t) => (t.note === 'F5' ? 1 : 0));
+      const { q, set, start, view, targets, press } = setup(onlyF5);
+      set('mode', 'wait');
+      set('text', '4′ 4');
+      expect(q<HTMLSelectElement>('[name="transpose"]').options[0].text).toBe('as written · best fit');
+      start();
+      view.tick(10);
+      expect(targets()).toEqual(['F#5']);
+      press('F#5');
+      expect(targets()).toEqual(['F4']);
+    });
+
+    it('resets to the standard tuning', () => {
+      const { q, root, savedTunings } = setup(raisedF);
+      q<HTMLButtonElement>('[name="retune-reset"]').click();
+      expect(notes(root)).toEqual(KALIMBA_21.map((t) => t.note));
+      expect(savedTunings.at(-1)).toEqual(KALIMBA_21.map(() => 0));
+      expect(q('.tuning').textContent).toBe('Tuning: Standard C');
+    });
+
+    it('stops a running song when the tuning changes', () => {
+      const { q, set, start, view, targets, root } = setup();
+      set('mode', 'wait');
+      start();
+      view.tick(10);
+      expect(targets()).toEqual(['C4']);
+      q<HTMLButtonElement>('[name="retune"]').click();
+      root.querySelectorAll<HTMLElement>('.tongue')[0].dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      expect(targets()).toEqual([]);
     });
   });
 

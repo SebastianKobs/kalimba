@@ -14,6 +14,8 @@
   --note-octave: #8fd3ff;
   --note-label: #1c1c1c;
   --miss: #ff6b6b;
+  --retuned: #b3261e;
+  --octave: #1a4fa0;
   --lane: #ffffff0d;
   --grid: #ffffff14;
   --panel: #00000033;
@@ -85,6 +87,21 @@ kbd {
 .help summary { cursor: pointer; }
 .help p { margin: 4px 0 0; }
 .status { min-height: 1.3em; margin: 6px 0 0; text-align: center; font-size: 0.9rem; }
+.tuning-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: center; margin-top: 8px; font-size: 0.85rem; color: var(--muted); }
+.tuning-row button {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  padding: 2px 12px;
+  cursor: pointer;
+}
+.tuning-row button[aria-pressed="true"] { background: var(--accent); color: var(--tine-label); border-color: var(--accent); font-weight: 600; }
+.kalimba.retuning .tongue { cursor: cell; }
+.tongue.retuned .letter, .tongue.retuned .cipher { color: var(--retuned); }
+/* octave marks are easy to overlook: bigger, heavier, own colour */
+.tongue .octave { font-size: 1.6em; font-weight: 900; line-height: 0.6; margin-left: 1px; color: var(--octave); }
 .skipped { margin: 2px 0 0; text-align: center; color: var(--muted); font-size: 0.8rem; }
 .skipped:empty { display: none; }
 .error { margin: 0; text-align: center; color: var(--miss); font-size: 0.9rem; }
@@ -145,7 +162,6 @@ kbd {
 }
 
 .tongue:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.tongue .dots { font-size: 0.7em; letter-spacing: -1px; min-height: 0.8em; }
 .tongue .key { margin-top: 6px; font-size: 0.75em; opacity: 0.55; font-weight: 400; }
 
 .tongue.target { box-shadow: 0 0 0 3px var(--accent), 0 0 18px var(--accent); }

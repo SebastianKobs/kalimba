@@ -4,6 +4,24 @@ import { KALIMBA_21 } from './layout';
 import { canvasHighway } from './practice/highway';
 import { mountPractice } from './practice/practice-view';
 import { SONGS } from './songs';
+import { parseStoredTuning, TUNING_STORAGE_KEY } from './stored-tuning';
+
+// storage may be blocked (private window, previews): the kalimba then starts in standard tuning
+function loadTuning(): number[] | undefined {
+  try {
+    return parseStoredTuning(localStorage.getItem(TUNING_STORAGE_KEY), KALIMBA_21.length);
+  } catch {
+    return undefined;
+  }
+}
+
+function saveTuning(halfSteps: readonly number[]): void {
+  try {
+    localStorage.setItem(TUNING_STORAGE_KEY, JSON.stringify(halfSteps));
+  } catch {
+    // not remembered; this session still has it
+  }
+}
 
 const sound = new WebAudioPlucker();
 const practice = mountPractice(document.querySelector<HTMLElement>('#app')!, {
@@ -11,6 +29,8 @@ const practice = mountPractice(document.querySelector<HTMLElement>('#app')!, {
   sound,
   songs: SONGS,
   highway: canvasHighway,
+  tuning: loadTuning(),
+  onTuningChange: saveTuning,
 });
 
 // audio may only start after a user gesture; render all tines on the first one

@@ -1,5 +1,6 @@
 import { keyForTongue, tongueForKey } from './keymap';
 import type { Tongue } from './layout';
+import { DOT_BELOW, tongueNumberParts } from './tuning';
 
 export interface Plucker {
   pluck(tongue: Tongue): void;
@@ -13,32 +14,47 @@ export interface KalimbaHandle {
   markMiss(tongue: Tongue): void;
   /** the tongue elements, left to right, for aligning things with them */
   readonly tongueElements: readonly HTMLElement[];
+  /** relabel after retuning; same tongues in the same places */
+  setTongues(tongues: readonly Tongue[]): void;
+  /** while on, a tap asks to retune the tongue (onRetune) instead of plucking it */
+  setRetuning(on: boolean): void;
   unmount(): void;
 }
 
-const DOT = '•';
+export interface KalimbaOptions {
+  onRetune?(tongue: Tongue): void;
+}
+
+
+
 
 function keyLabel(code: string): string {
   const symbols: Record<string, string> = { Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: "'" };
   return symbols[code] ?? code.replace('Key', '');
 }
 
+function labelTongue(el: HTMLElement, tongue: Tongue): void {
+  el.dataset.note = tongue.note;
+  el.setAttribute('aria-label', tongue.note);
+  el.classList.toggle('retuned', tongue.tuning !== 0);
+  // written as you'd type it into a song: F#′ over #4′
+  const { accidental, digit, above, below } = tongueNumberParts(tongue);
+  // primes in their own element so they stand out; a dot below combines with the character right before it
+  const dots = DOT_BELOW.repeat(below);
+  const primes = above ? `<span class="octave">${above}</span>` : '';
+  el.innerHTML = `
+    <span class="letter">${tongue.letter}${dots}${tongue.accidental}${primes}</span>
+    <span class="cipher">${accidental}${digit}${dots}${primes}</span>
+    <span class="key">${keyLabel(keyForTongue(tongue))}</span>`;
+}
+
 function renderTongue(tongue: Tongue): HTMLElement {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'tongue';
-  el.dataset.note = tongue.note;
   el.dataset.index = String(tongue.index);
   el.style.setProperty('--length', String(tongue.lengthRatio));
-  el.setAttribute('aria-label', tongue.note);
-  const dotsAbove = DOT.repeat(Math.max(0, tongue.octaveDots));
-  const dotsBelow = DOT.repeat(Math.max(0, -tongue.octaveDots));
-  el.innerHTML = `
-    <span class="letter">${tongue.letter}</span>
-    <span class="dots">${dotsAbove}</span>
-    <span class="cipher">${tongue.cipher}</span>
-    <span class="dots">${dotsBelow}</span>
-    <span class="key">${keyLabel(keyForTongue(tongue))}</span>`;
+  labelTongue(el, tongue);
   return el;
 }
 
@@ -53,8 +69,15 @@ function flash(el: HTMLElement, className: string): void {
 }
 
 /** Draws the tongues into root and wires pointer + keyboard input to the plucker. */
-export function mountKalimba(root: HTMLElement, tongues: readonly Tongue[], plucker: Plucker): KalimbaHandle {
+export function mountKalimba(
+  root: HTMLElement,
+  initialTongues: readonly Tongue[],
+  plucker: Plucker,
+  options: KalimbaOptions = {},
+): KalimbaHandle {
   const doc = root.ownerDocument;
+  let tongues = initialTongues;
+  let retuning = false;
   const board = doc.createElement('div');
   board.className = 'kalimba';
   const elements = tongues.map(renderTongue);
@@ -77,6 +100,10 @@ export function mountKalimba(root: HTMLElement, tongues: readonly Tongue[], pluc
     const tongue = tongueAt(e.target);
     if (!tongue) return;
     e.preventDefault();
+    if (retuning) {
+      options.onRetune?.(tongue); // no strumming while tuning: one tap, one tongue
+      return;
+    }
     lastTongue.set(e.pointerId, tongue);
     pluck(tongue);
   };
@@ -90,7 +117,7 @@ export function mountKalimba(root: HTMLElement, tongues: readonly Tongue[], pluc
   const onPointerUp = (e: PointerEvent) => lastTongue.delete(e.pointerId);
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
-    const tongue = tongueForKey(e.code);
+    const tongue = tongueForKey(e.code, tongues);
     if (!tongue) return;
     e.preventDefault();
     pluck(tongue);
@@ -110,6 +137,14 @@ export function mountKalimba(root: HTMLElement, tongues: readonly Tongue[], pluc
     },
     markMiss: (tongue) => flash(elements[tongue.index], 'miss'),
     tongueElements: elements,
+    setTongues(next) {
+      tongues = next;
+      next.forEach((tongue, i) => labelTongue(elements[i], tongue));
+    },
+    setRetuning(on) {
+      retuning = on;
+      board.classList.toggle('retuning', on);
+    },
     unmount() {
       doc.removeEventListener('pointermove', onPointerMove);
       doc.removeEventListener('pointerup', onPointerUp);

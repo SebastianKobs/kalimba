@@ -6,14 +6,16 @@ const KEYS_LOW_TO_HIGH = [
   'KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon', 'Quote',
 ];
 
+// keys follow the tongues' places in pitch order of the standard tuning, so retuning never moves a key
 const byPitch = [...KALIMBA_21].sort((a, b) => a.midi - b.midi);
-const tongueByKey = new Map(KEYS_LOW_TO_HIGH.map((code, i) => [code, byPitch[i]]));
-const keyByTongue = new Map(KEYS_LOW_TO_HIGH.map((code, i) => [byPitch[i], code]));
+const indexByKey = new Map(KEYS_LOW_TO_HIGH.map((code, i) => [code, byPitch[i].index]));
+const keyByIndex = new Map(KEYS_LOW_TO_HIGH.map((code, i) => [byPitch[i].index, code]));
 
-export function tongueForKey(code: string): Tongue | undefined {
-  return tongueByKey.get(code);
+export function tongueForKey(code: string, tongues: readonly Tongue[] = KALIMBA_21): Tongue | undefined {
+  const index = indexByKey.get(code);
+  return index === undefined ? undefined : tongues[index];
 }
 
 export function keyForTongue(tongue: Tongue): string {
-  return keyByTongue.get(tongue)!;
+  return keyByIndex.get(tongue.index)!;
 }

@@ -2,7 +2,7 @@ import type { Plucker } from './kalimba-view';
 import type { Tongue } from './layout';
 import { renderTine } from './synth';
 
-const VOICE_SECONDS = 7;
+const VOICE_SECONDS = 4.5; // longest tine (F3) is 60 dB down after ~3 s
 const TAIL_FADE_SECONDS = 0.5;
 // re-plucking a ringing tine damps it first; short ramp avoids a click
 const DAMP_SECONDS = 0.02;
@@ -16,8 +16,9 @@ interface Voice {
 export class WebAudioPlucker implements Plucker {
   private context?: AudioContext;
   private master?: AudioNode;
-  private readonly buffers = new Map<Tongue, AudioBuffer>();
-  private readonly voices = new Map<Tongue, Voice>();
+  // buffers by pitch, voices by place: a retuned tongue is a new object but the same tine
+  private readonly buffers = new Map<number, AudioBuffer>();
+  private readonly voices = new Map<number, Voice>();
 
   pluck(tongue: Tongue): void {
     const context = this.ensureContext();
@@ -31,9 +32,9 @@ export class WebAudioPlucker implements Plucker {
     source.connect(gain).connect(this.master!);
     source.start(now);
     const voice = { source, gain };
-    this.voices.set(tongue, voice);
+    this.voices.set(tongue.index, voice);
     source.onended = () => {
-      if (this.voices.get(tongue) === voice) this.voices.delete(tongue);
+      if (this.voices.get(tongue.index) === voice) this.voices.delete(tongue.index);
       gain.disconnect();
     };
   }
@@ -60,22 +61,22 @@ export class WebAudioPlucker implements Plucker {
   }
 
   private bufferFor(tongue: Tongue, context: AudioContext): AudioBuffer {
-    const cached = this.buffers.get(tongue);
+    const cached = this.buffers.get(tongue.frequency);
     if (cached) return cached;
     const samples = renderTine(tongue.frequency, context.sampleRate, VOICE_SECONDS);
     const buffer = context.createBuffer(1, samples.length, context.sampleRate);
     buffer.copyToChannel(samples, 0);
-    this.buffers.set(tongue, buffer);
+    this.buffers.set(tongue.frequency, buffer);
     return buffer;
   }
 
   private damp(tongue: Tongue, now: number): void {
-    const voice = this.voices.get(tongue);
+    const voice = this.voices.get(tongue.index);
     if (!voice) return;
     voice.gain.gain.cancelScheduledValues(now);
     voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
     voice.gain.gain.linearRampToValueAtTime(0, now + DAMP_SECONDS);
     voice.source.stop(now + DAMP_SECONDS);
-    this.voices.delete(tongue);
+    this.voices.delete(tongue.index);
   }
 }
