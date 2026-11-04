@@ -1,0 +1,27 @@
+/* The Klang panel: a slider for each macro, in the page's own look. */
+.klang-panel { width: min(100%, 900px); margin-top: 12px; text-align: center; }
+.klang-panel button {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  padding: 4px 14px;
+  cursor: pointer;
+}
+.klang {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px 24px;
+  margin-top: 8px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--panel);
+  text-align: left;
+}
+.klang[hidden] { display: none; }
+.klang label { display: grid; grid-template-columns: 6.5em 1fr 5.5em; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
+.klang input[type="range"] { accent-color: var(--accent); width: 100%; }
+.klang output { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+.klang button[name="klang-reset"] { justify-self: start; }

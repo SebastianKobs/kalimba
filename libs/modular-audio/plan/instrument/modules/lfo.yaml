@@ -1,0 +1,42 @@
+# An LFO: an oscillator at its rate, then its depth, then a scale, a modulator.
+# Its rate its oscillator's, a time with a sync switch: synced, a note value; free, in Hz.
+# Its phase its oscillator's: reset with each note, or running free.
+# Its depth in the units of the param it's wired into: cents, Hz, a gain's share.
+# Its scale 1, or a value of the note's wired in, its depth then a share of it: a vibrato as a
+# share of the note's frequency.
+# Its delay and fade-in an envelope on its depth.
+kind: LFO
+form: modulator
+outputs: [{ name: out, channels: 1 }]
+children:
+  - { name: osc, kind: oscillator }
+  - { name: depth, kind: gain }
+  - { name: scale, kind: gain }
+wires:
+  - { from: { node: osc, output: out }, to: { node: depth, input: in } }
+  - { from: { node: depth, output: out }, to: { node: scale, input: in } }
+  - { from: { node: scale, output: out }, to: { output: out } }
+macros:
+  - name: sync
+    hint: >-
+      Its rate synced to the tempo: on, a note value; off, in hertz. Both are kept: the switch picks
+      one.
+    maps: [{ to: [osc, sync], factor: 1, offset: 0 }]
+  - name: note
+    hint: >-
+      Its rate while synced: a note value (1/8, 1/8. dotted, 1/8t a triplet), following the tempo.
+    maps: [{ to: [osc, note], factor: 1, offset: 0 }]
+  - name: hz
+    hint: >-
+      Its rate while free, in hertz.
+    maps: [{ to: [osc, frequency], factor: 1, offset: 0 }]
+  - name: depth
+    hint: >-
+      How far it moves what it's wired into, in that param's units: cents, hertz, a gain's share.
+    spec: { range: [0, 1000, 0.0001], default: 0 }
+    maps: [{ to: [depth, gain], factor: 1, offset: 0 }]
+  - name: scale
+    hint: >-
+      What its depth is a share of: 1, or a value of the note's wired in, its frequency for a vibrato.
+    spec: { range: [0, 20000, 0.01], default: 1 }
+    maps: [{ to: [scale, gain], factor: 1, offset: 0 }]

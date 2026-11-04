@@ -1,0 +1,16 @@
+# A tremolo: a gain an LFO moves, a stage; at rest it passes the sound as it comes.
+kind: Tremolo
+form: stage
+inputs: [{ name: in }]
+outputs: [{ name: out }]
+children:
+  - { name: gain, kind: gain }
+wires:
+  - { from: { input: in }, to: { node: gain, input: in } }
+  - { from: { node: gain, output: out }, to: { output: out } }
+macros:
+  - name: gain
+    hint: >-
+      The gain an LFO moves: at rest it passes the sound as it comes.
+    spec: { range: [0, 2, 0.001], default: 1 }
+    maps: [{ to: [gain, gain], factor: 1, offset: 0 }]

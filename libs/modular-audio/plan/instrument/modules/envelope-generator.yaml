@@ -1,0 +1,53 @@
+# An envelope generator: an envelope, then a gain its note's velocity sets, a modulator.
+# Its gate the note's; its stages, its curve and its mode its block's.
+# Its amount in the units of the param it's wired into: a gain's share, semitones for a tune.
+# Its velocity 1, moving it the same at any velocity, or the note's wired in.
+kind: Envelope generator
+form: modulator
+outputs: [{ name: out, channels: 1 }]
+children:
+  - { name: envelope, kind: envelope }
+  - { name: velocity, kind: gain }
+wires:
+  - { from: { node: envelope, output: out }, to: { node: velocity, input: in } }
+  - { from: { node: velocity, output: out }, to: { output: out } }
+macros:
+  - name: gate
+    hint: >-
+      Open while the note is held: the note's start opens it, its end closes it.
+    maps: [{ to: [envelope, gate], factor: 1, offset: 0 }]
+  - name: delay
+    hint: >-
+      Seconds before its attack starts: the dotted line on its curve.
+    maps: [{ to: [envelope, delay], factor: 1, offset: 0 }]
+  - name: attack
+    hint: >-
+      How long it rises to its full amount, in seconds.
+    maps: [{ to: [envelope, attack], factor: 1, offset: 0 }]
+  - name: hold
+    hint: >-
+      How long it holds its full amount before its decay, in seconds.
+    maps: [{ to: [envelope, hold], factor: 1, offset: 0 }]
+  - name: decay
+    hint: >-
+      How long it falls from its full amount to its sustain, in seconds.
+    maps: [{ to: [envelope, decay], factor: 1, offset: 0 }]
+  - name: sustain
+    hint: >-
+      The share of its full amount it holds while the note is held, until the note's end.
+    maps: [{ to: [envelope, sustain], factor: 1, offset: 0 }]
+  - name: release
+    hint: >-
+      How long it falls away once the note ends, in seconds: the dashed line on its curve.
+    maps: [{ to: [envelope, release], factor: 1, offset: 0 }]
+  - name: amount
+    hint: >-
+      How far it moves what it's wired into, in that param's units: a share of a gain, semitones for a
+      tune.
+    maps: [{ to: [envelope, amount], factor: 1, offset: 0 }]
+  - name: velocity
+    hint: >-
+      How much the note's velocity scales it: 1 the same however hard it's played, or the note's wired
+      in.
+    spec: { range: [0, 1, 0.01], default: 1 }
+    maps: [{ to: [velocity, gain], factor: 1, offset: 0 }]

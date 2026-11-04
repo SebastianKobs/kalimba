@@ -1,0 +1,141 @@
+# The kalimba, as a file of instruments (libs/modular-audio/plan/instrument): one voice card, one patch.
+# A tine's sound, as a modular synth patches it: each partial a source into a VCA its own envelope opens.
+# The gate is held while the tine rings (the kalimba sends the note off once it has rung, or at once when the
+# tongue is plucked again): its end releases every envelope in 30 ms, as a finger damps a tine.
+instruments:
+  Kalimba tine:
+    children:
+      # the tine's modes, each at its ratio to the note (the frequency macro's factors below): the note; a
+      # twin a hair above, which beats with it, a slow shimmer; weak 2nd and 3rd harmonics, so the octave is
+      # easy to hear; the cantilever's 2nd and 3rd bending modes, inharmonic: the metallic ping
+      - { name: tine, kind: VCO, role: source, values: { level: 0.45 } }
+      - { name: twin, kind: VCO, role: source, values: { level: 0.12, tune: 0.03 } }
+      - { name: 2nd, kind: VCO, role: source, values: { level: 0.08 } }
+      - { name: 3rd, kind: VCO, role: source, values: { level: 0.025 } }
+      - { name: ping, kind: VCO, role: source, values: { level: 0.2 } }
+      - { name: ting, kind: VCO, role: source, values: { level: 0.08 } }
+      # the thumb releasing the tine: bright noise, its buffer's offset drawn per voice, so no two plucks
+      # click alike
+      - name: click
+        kind: Noise source
+        role: source
+        values: { cutoff: 3000, level: 0.25 }
+        settings: { filter/type: highpass }
+      # the box: a short wooden knock at a fixed 240 Hz, whatever the note
+      - { name: knock, kind: VCO, role: source, values: { frequency: 240, level: 0.08 } }
+      # one envelope for each group of partials that fades alike; its decay is how long it takes to
+      # fall 80 dB, about 9.2 time constants
+      - name: ring env
+        kind: Envelope generator
+        role: modulator
+        values: { attack: 0.001, sustain: 0, release: 0.03 }
+        settings: { envelope/mode: gate }
+      - name: harmonics env
+        kind: Envelope generator
+        role: modulator
+        values: { attack: 0.001, sustain: 0, release: 0.03 }
+        settings: { envelope/mode: gate }
+      - name: ping env
+        kind: Envelope generator
+        role: modulator
+        values: { attack: 0.001, decay: 0.37, sustain: 0, release: 0.03 }
+        settings: { envelope/mode: gate }
+      - name: click env
+        kind: Envelope generator
+        role: modulator
+        values: { attack: 0.0003, decay: 0.02, sustain: 0, release: 0.03 }
+        settings: { envelope/mode: gate }
+      - name: knock env
+        kind: Envelope generator
+        role: modulator
+        values: { attack: 0.001, decay: 0.23, sustain: 0, release: 0.03 }
+        settings: { envelope/mode: gate }
+      - { name: ring vca, kind: VCA, role: stage, values: { gain: 0 } }
+      - { name: harmonics vca, kind: VCA, role: stage, values: { gain: 0 } }
+      - { name: ping vca, kind: VCA, role: stage, values: { gain: 0 } }
+      - { name: click vca, kind: VCA, role: stage, values: { gain: 0 } }
+      - { name: knock vca, kind: VCA, role: stage, values: { gain: 0 } }
+      # a lowpass the tine's partials and the knock pass through, at 3500 Hz: the Klang panel's Helligkeit
+      # moves it; the click goes beside it
+      - name: tone
+        kind: VCF
+        role: stage
+        values: { cutoff: 3500 }
+        settings: { filter/type: lowpass }
+      - { name: out, kind: Out, role: out }
+    wires:
+      - { from: { node: tine, output: out }, to: { node: ring vca, input: in } }
+      - { from: { node: twin, output: out }, to: { node: ring vca, input: in } }
+      - { from: { node: 2nd, output: out }, to: { node: harmonics vca, input: in } }
+      - { from: { node: 3rd, output: out }, to: { node: harmonics vca, input: in } }
+      - { from: { node: ping, output: out }, to: { node: ping vca, input: in } }
+      - { from: { node: ting, output: out }, to: { node: ping vca, input: in } }
+      - { from: { node: click, output: out }, to: { node: click vca, input: in } }
+      - { from: { node: knock, output: out }, to: { node: knock vca, input: in } }
+      - { from: { node: ring env, output: out }, to: { node: ring vca, param: gain } }
+      - { from: { node: harmonics env, output: out }, to: { node: harmonics vca, param: gain } }
+      - { from: { node: ping env, output: out }, to: { node: ping vca, param: gain } }
+      - { from: { node: click env, output: out }, to: { node: click vca, param: gain } }
+      - { from: { node: knock env, output: out }, to: { node: knock vca, param: gain } }
+      - { from: { node: ring vca, output: out }, to: { node: tone, input: in } }
+      - { from: { node: harmonics vca, output: out }, to: { node: tone, input: in } }
+      - { from: { node: ping vca, output: out }, to: { node: tone, input: in } }
+      # the click beside the lowpass: Helligkeit darkens the tine, the thumb still clicks
+      - { from: { node: click vca, output: out }, to: { node: out, input: in } }
+      - { from: { node: knock vca, output: out }, to: { node: tone, input: in } }
+      - { from: { node: tone, output: out }, to: { node: out, input: in } }
+      - { from: { node: out, output: out }, to: { output: out } }
+    macros:
+      # each mode's frequency a ratio to the note's, exact; a tune in semitones reaches only 4 octaves,
+      # short of the 3rd bending mode. The twin at the note, detuned by its tune (0.03 semitones: 2.3 Hz of
+      # beat at E6, 0.3 at F3), which the Klang panel's Schwebung moves
+      - name: frequency
+        maps:
+          - { to: [tine, frequency], factor: 1, offset: 0 }
+          - { to: [twin, frequency], factor: 1, offset: 0 }
+          - { to: [2nd, frequency], factor: 2, offset: 0 }
+          - { to: [3rd, frequency], factor: 3, offset: 0 }
+          - { to: [ping, frequency], factor: 6.267, offset: 0 }
+          - { to: [ting, frequency], factor: 17.547, offset: 0 }
+      - name: gate
+        maps:
+          - { to: [ring env, gate], factor: 1, offset: 0 }
+          - { to: [harmonics env, gate], factor: 1, offset: 0 }
+          - { to: [ping env, gate], factor: 1, offset: 0 }
+          - { to: [click env, gate], factor: 1, offset: 0 }
+          - { to: [knock env, gate], factor: 1, offset: 0 }
+      - name: velocity
+        maps:
+          - { to: [ring env, velocity], factor: 1, offset: 0 }
+          - { to: [harmonics env, velocity], factor: 1, offset: 0 }
+          - { to: [ping env, velocity], factor: 1, offset: 0 }
+          - { to: [click env, velocity], factor: 1, offset: 0 }
+          - { to: [knock env, velocity], factor: 1, offset: 0 }
+      # the note's own decay time (MIDI's per-note controller), which the kalimba sets by pitch:
+      # low tines ring longer
+      - name: decay time
+        maps:
+          - { to: [ring env, decay], factor: 1, offset: 0 }
+          - { to: [harmonics env, decay], factor: 0.7, offset: 0 }
+  # the metronome's click: a short blip, its pitch and loudness the note's (higher and louder on a bar's first beat)
+  Metronome click:
+    children:
+      - { name: osc, kind: VCO, role: source }
+      - name: env
+        kind: Envelope generator
+        role: modulator
+        values: { attack: 0.0005, decay: 0.05, sustain: 0, release: 0.01 }
+      - { name: vca, kind: VCA, role: stage, values: { gain: 0 } }
+      - { name: out, kind: Out, role: out }
+    wires:
+      - { from: { node: osc, output: out }, to: { node: vca, input: in } }
+      - { from: { node: env, output: out }, to: { node: vca, param: gain } }
+      - { from: { node: vca, output: out }, to: { node: out, input: in } }
+      - { from: { node: out, output: out }, to: { output: out } }
+    macros:
+      - { name: frequency, maps: [{ to: [osc, frequency], factor: 1, offset: 0 }] }
+      - { name: gate, maps: [{ to: [env, gate], factor: 1, offset: 0 }] }
+      - { name: velocity, maps: [{ to: [env, velocity], factor: 1, offset: 0 }] }
+patches:
+  kalimba: { instrument: Kalimba tine }
+  click: { instrument: Metronome click }

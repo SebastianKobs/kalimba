@@ -1,0 +1,29 @@
+# A VCF: a filter, a stage.
+# Its cutoff in Hz; the voice card's frequency wired in where it follows the keys.
+# Its tune in semitones onto its detune: a sweep, or an offset from the keys (1.4 times the
+# note is +5.83).
+kind: VCF
+form: stage
+inputs: [{ name: in }]
+outputs: [{ name: out }]
+children:
+  - { name: filter, kind: filter }
+wires:
+  - { from: { input: in }, to: { node: filter, input: in } }
+  - { from: { node: filter, output: out }, to: { output: out } }
+macros:
+  - name: cutoff
+    hint: >-
+      Its cutoff, in hertz: past it the sound is taken away; following the keys where the note's
+      frequency is wired in.
+    maps: [{ to: [filter, frequency], factor: 1, offset: 0 }]
+  - name: resonance
+    hint: >-
+      How much it rings at its cutoff, as an EQ's Q: 0.707 flat, more a bump there.
+    maps: [{ to: [filter, resonance], factor: 1, offset: 0 }]
+  - name: tune
+    hint: >-
+      Its cutoff moved in semitones: a sweep, or an offset from the keys (1.4 times the note is
+      +5.83).
+    spec: { unit: semitones, range: [-48, 48, 0.01], default: 0 }
+    maps: [{ to: [filter, detune], factor: 100, offset: 0 }]

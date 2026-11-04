@@ -13,11 +13,20 @@ Log entries also carry the date: ``- `pending` 2026-11-04 LABEL: **Decision or c
 | Command | What it does |
 |---|---|
 | `npm run dev` | Vite dev server |
-| `npm test` | Vitest, all tests |
+| `npm test` | Vitest: the unit tests, in node and jsdom |
+| `npm run test:e2e` | Playwright: the sound rendered offline in Firefox, muted, and measured (`test/e2e/`) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run build` | typecheck, then production build into `dist/` |
+| `npm run update-libs` | copy stim-garden's libraries into `libs/` again (`tools/update-libs.sh`; `COMMIT=…` for another commit) |
 
 Enable the commit hook once per clone: `git config core.hooksPath .githooks`.
+
+## Libraries from stim-garden
+
+The sound is built with stim-garden's modular-audio libraries, copied into `libs/` from the commit in `libs/PINNED` by `tools/update-libs.sh`, with the YAML loader they need (`tools/yaml.js`, `types/yaml.d.ts`).
+
+- They are external, like a dependency: never edited here, their tests neither copied nor run; stim-garden tests them. A change is made in stim-garden and copied.
+- They import with `.ts` extensions and need ES2023 (`tsconfig.json`); `.yaml` files load through the Vite plugin.
 
 ## Layout of the card
 
@@ -43,16 +52,21 @@ Core logic is pure and tested in Node. Edges are thin.
 | `src/music/interval.ts` | `describeShift`: semitones → "down a fifth (7 semitones)" |
 | `src/practice/metronome.ts` | `clicksBetween`: the beats the clock passed, first of each bar accented |
 | `src/practice/session.ts` | `PracticeSession`: clock and scoring in beats for listen, play-along and wait modes; `currentNotes` for highlighting the text |
-| `src/synth.ts` | `renderTine`: frequency → mono samples: noise click and 240 Hz body knock at the attack, decaying sine modes (fundamental, weak 2nd/3rd harmonics, bending modes at 6.267× and 17.547×), ~2.5 s to −60 dB at C4 |
+| `src/sound/kalimba.yaml` | the voice cards as a file of instruments: the tine (its modes at 1, 1.0017 (a twin detuned by its tune), 2, 3, 6.267 and 17.547 times the note, a noise click, a 240 Hz box knock, each group through a VCA its envelope opens, all but the click through a lowpass at 3500 Hz) and the metronome click; patches `kalimba` and `click` |
+| `src/sound/kalimba-card.ts` | the file read (`KALIMBA`); `decayTimeFor`: a note's decay time by its pitch, ~2.5 s to −60 dB at C4 |
+| `src/sound/plucks.ts` | `Plucks`: a pluck as MIDI 2.0 messages (note on, decay time, note off once rung; a ringing tongue's earlier note let go: damped), shaped by Stimmung and Nachklang; `clickMessages` |
+| `src/sound/instruments.ts` | edge: the kalimba's and click's `Instrument`s built in a context, for the player and the offline render alike |
+| `src/sound/klang.ts` | the Klang panel's macros (Obertöne, Helligkeit from 3500 Hz, Anschlag, Körper, Schwebung, Stimmung, Nachklang): `presetFor` maps them onto the voice card's values (read from `kalimba.yaml`), `pitchOffset` and `ringFactor` onto each pluck; stored in the browser (`parseStoredKlang`) |
+| `src/sound/klang-panel.ts`, `.css` | edge: the Klang panel behind a button, a German slider for each macro (a double-click puts one back) and a reset |
+| `src/sound/player.ts` | edge: `ModularPlayer`, the audio context started on a gesture, master gain into a limiter, plucks with a slightly random velocity, clicks; `setKlang` glides the kalimba to new macros |
 | `src/keymap.ts` | `KeyboardEvent.code` → tongue place, in the standard tuning's pitch order: bottom letter row then home row (QWERTZ `Y`…`-`, `A`…`Ä`); retuning never moves a key |
 | `src/kalimba-view.ts` | edge: draws the tongues, maps pointer and keyboard input to `Plucker.pluck`; relabels retuned tongues; retune mode turns taps into `onRetune` |
-| `src/audio.ts` | edge: `WebAudioPlucker`, one voice per tongue, damps on re-pluck, limiter on the master |
 | `src/practice/practice-view.ts` | edge: song, mode, tempo (BPM), Takt (meter, 4/4 default; `meter:` line sets it), Klick and transpose controls; Retune toggle (tap cycles ♮ → ♯ → ♭), Reset tuning, tuning summary; while a song runs a read-only tab view replaces the song box and highlights the part being played; song box with name, tab tuning (writes a `key:` line) + Import (adds to the song list, this session only); status, skipped text, errors; kalimba with targets |
 | `src/practice/highway.ts` | edge: canvas lane per tongue, notes falling onto the bridge |
 | `src/songs/index.ts` | built-in songs, public domain only |
 | `src/main.ts` | wires practice view, audio and the animation frame loop; loads and saves the tuning in localStorage |
 
-Tests live in `test/`. The view tests run in jsdom with a fake plucker and no highway. `audio.ts`, `highway.ts` and drag-to-strum have no automated tests; they are checked by playing.
+Tests live in `test/`. The view tests run in jsdom with a fake plucker and no highway. The sound is tested end to end in `test/e2e/`: `render.html` renders plucks offline through the same instruments as the player, `sound.spec.ts` measures pitch, ring, click, shimmer, harmonics, knock, damping, each Klang macro's effect and the metronome; `klang.spec.ts` opens the panel and moves a slider. `player.ts`, `highway.ts` and drag-to-strum have no automated tests; they are checked by playing.
 
 ## Songs
 

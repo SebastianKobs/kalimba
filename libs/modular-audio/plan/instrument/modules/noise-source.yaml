@@ -1,0 +1,42 @@
+# A noise source: a noise through a filter of its own, then its level, a source.
+# Its filter following the keys, where the voice card's frequency is wired into its cutoff, at an
+# offset in semitones, its tune onto the filter's detune.
+# Looped or not; where in its buffer it starts, up to its offset, drawn as its voice starts; its stop.
+kind: Noise source
+form: source
+outputs: [{ name: out, channels: 1 }]
+children:
+  - { name: noise, kind: noise }
+  - { name: filter, kind: filter }
+  - { name: level, kind: gain }
+wires:
+  - { from: { node: noise, output: out }, to: { node: filter, input: in } }
+  - { from: { node: filter, output: out }, to: { node: level, input: in } }
+  - { from: { node: level, output: out }, to: { output: out } }
+macros:
+  - name: level
+    hint: >-
+      How loud it goes into the chain: a share, 1 as it comes.
+    spec: { range: [0, 2, 0.001], default: 1 }
+    maps: [{ to: [level, gain], factor: 1, offset: 0 }]
+  - name: cutoff
+    hint: >-
+      Its filter's cutoff, in hertz; following the keys where the note's frequency is wired in.
+    maps: [{ to: [filter, frequency], factor: 1, offset: 0 }]
+  - name: resonance
+    hint: >-
+      How much its filter rings at its cutoff, as an EQ's Q: 0.707 flat, more a bump there.
+    maps: [{ to: [filter, resonance], factor: 1, offset: 0 }]
+  - name: tune
+    hint: >-
+      Its filter's cutoff moved in semitones: an offset from the keys where it follows them.
+    spec: { unit: semitones, range: [-48, 48, 0.01], default: 0 }
+    maps: [{ to: [filter, detune], factor: 100, offset: 0 }]
+  - name: offset
+    hint: >-
+      How far into its noise it starts, at most, drawn anew for each note, so no two sound alike.
+    maps: [{ to: [noise, offset], factor: 1, offset: 0 }]
+  - name: stop
+    hint: >-
+      When it stops, in seconds from the note's start; at 0 it plays until its voice is let go.
+    maps: [{ to: [noise, stop], factor: 1, offset: 0 }]

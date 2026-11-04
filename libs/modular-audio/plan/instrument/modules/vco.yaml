@@ -1,0 +1,34 @@
+# A VCO: an oscillator and its level, a source.
+# Its frequency the note's, set by the voice card's frequency.
+# Its tune in semitones onto its detune in cents: a ratio to the note, and a detune, as pitch adds
+# where ratios multiply (a ratio of 4 is +24, of 2.76 +17.59).
+# A modulator wired into its frequency, its tune or its level moves them there.
+# Its stop, in s from the note's start; at 0 none, playing until its voice is let go.
+kind: VCO
+form: source
+outputs: [{ name: out, channels: 1 }]
+children:
+  - { name: osc, kind: oscillator }
+  - { name: level, kind: gain }
+wires:
+  - { from: { node: osc, output: out }, to: { node: level, input: in } }
+  - { from: { node: level, output: out }, to: { output: out } }
+macros:
+  - name: frequency
+    hint: >-
+      Its frequency, in hertz: the note's, which the voice card sets.
+    maps: [{ to: [osc, frequency], factor: 1, offset: 0 }]
+  - name: tune
+    hint: >-
+      Semitones from the note: 12 an octave up; a few hundredths against another, a slow beat.
+    spec: { unit: semitones, range: [-48, 48, 0.01], default: 0 }
+    maps: [{ to: [osc, detune], factor: 100, offset: 0 }]
+  - name: level
+    hint: >-
+      How loud it goes into the chain: a share, 1 as it comes.
+    spec: { range: [0, 2, 0.001], default: 1 }
+    maps: [{ to: [level, gain], factor: 1, offset: 0 }]
+  - name: stop
+    hint: >-
+      When it stops, in seconds from the note's start; at 0 it plays until its voice is let go.
+    maps: [{ to: [osc, stop], factor: 1, offset: 0 }]
