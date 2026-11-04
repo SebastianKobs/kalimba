@@ -4,7 +4,17 @@ import type { Instruments } from '../../libs/modular-audio/plan/instrument/index
 import type { Preset } from '../../libs/modular-audio/plan/planner/index.ts';
 import { KALIMBA, KALIMBA_PATCH, TINE_CARD } from './kalimba-card';
 
-export type MacroName = 'obertoene' | 'helligkeit' | 'anschlag' | 'koerper' | 'schwebung' | 'stimmung' | 'nachklang';
+export type MacroName =
+  | 'obertoene'
+  | 'ungerade'
+  | 'rauheit'
+  | 'helligkeit'
+  | 'anschlag'
+  | 'koerper'
+  | 'schwebung'
+  | 'resonanz'
+  | 'stimmung'
+  | 'nachklang';
 export type KlangValues = Readonly<Record<MacroName, number>>;
 
 export interface Macro {
@@ -32,6 +42,22 @@ export const MACROS: readonly Macro[] = [
     label: 'Obertöne',
     hint: 'Von rein zu metallisch: die Obertöne der Zunge und ihr heller, metallischer Klang.',
     range: [0, 2, 0.01],
+    default: 1,
+    format: percent,
+  },
+  {
+    name: 'ungerade',
+    label: 'Ungerade Obertöne',
+    hint: 'Die ungeraden Harmonischen, 3. bis 9.: ein Hauch hohler, holziger Klang.',
+    range: [0, 4, 0.01],
+    default: 1,
+    format: percent,
+  },
+  {
+    name: 'rauheit',
+    label: 'Rauheit',
+    hint: 'Der Schmutz in den hohen Obertönen: ein leises Rauschen und leicht verstimmte Teiltöne, wie bei einer echten Kalimba.',
+    range: [0, 3, 0.01],
     default: 1,
     format: percent,
   },
@@ -68,6 +94,14 @@ export const MACROS: readonly Macro[] = [
     format: percent,
   },
   {
+    name: 'resonanz',
+    label: 'Resonanz',
+    hint: 'Wie stark die anderen Zungen leise mitklingen, wenn eine angezupft wird.',
+    range: [0, 3, 0.01],
+    default: 1,
+    format: percent,
+  },
+  {
     name: 'stimmung',
     label: 'Stimmung',
     hint: 'Die ganze Kalimba höher oder tiefer, in Cent: 100 Cent sind ein Halbton.',
@@ -98,7 +132,11 @@ export function presetFor(values: KlangValues): Preset {
   return {
     ...KALIMBA.patches[KALIMBA_PATCH]!, // the file has its patch
     values: {
-      ...scaled(['2nd/level', '3rd/level', 'ping/level', 'ting/level'], values.obertoene),
+      ...scaled(['2nd/level', 'ping/level', 'ting/level'], values.obertoene),
+      ...scaled(['3rd/level', '5th/level', '7th/level', '9th/level'], values.obertoene * values.ungerade),
+      // the dirt: the grit's noise, and how sharp the upper partials are; clean and exactly harmonic at 0
+      ...scaled(['grit/level'], values.obertoene * values.rauheit),
+      ...scaled(['7th/tune', '9th/tune'], values.rauheit),
       ...scaled(['knock/level'], values.koerper),
       // the click louder and a little longer together, as a harder thumb
       ...scaled(['click/level', 'click env/decay'], values.anschlag),
@@ -114,6 +152,15 @@ export function instrumentsWith(values: KlangValues): Instruments {
   return { ...KALIMBA, patches: { ...KALIMBA.patches, [KALIMBA_PATCH]: presetFor(values) } };
 }
 
+// Resonanz at 100 %: the resonance bank's output as it sounded right by ear, the neighbours about 35 dB under the
+// note (the slider's 93 % on its former 30 dB curve to a gain of 100), calibrated on the render (test/e2e/sound.spec.ts)
+const RESONANCE_AT_100 = 100 * 10 ** ((-0.07 * 30) / 20);
+
+/** Resonanz: the gain of the other tongues ringing along, scaled as the other sliders scale their levels. */
+export function resonanceGain(values: KlangValues): number {
+  return RESONANCE_AT_100 * values.resonanz;
+}
+
 /** Stimmung: every note's pitch moved, in semitones. */
 export function pitchOffset(values: KlangValues): number {
   return values.stimmung / 100;
@@ -124,7 +171,8 @@ export function ringFactor(values: KlangValues): number {
   return values.nachklang;
 }
 
-export const KLANG_STORAGE_KEY = 'kalimba.klang';
+// .2: the macros' scales changed (the user's ear made 100 %), so what was stored before would apply twice
+export const KLANG_STORAGE_KEY = 'kalimba.klang.2';
 
 /** Macro values read back from storage: each within its range, its default otherwise. */
 export function parseStoredKlang(raw: string | null): KlangValues {

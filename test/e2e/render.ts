@@ -1,10 +1,9 @@
 // The kalimba rendered offline, for the end-to-end tests: plucks, clicks or raw messages, as the live player
-// sends them, through the same instruments (src/sound/instruments.ts), into an OfflineAudioContext.
+// sends them, through the same sound (src/sound/kalimba-sound.ts), into an OfflineAudioContext.
 import type { Message } from '../../libs/midi/protocol/index.ts';
-import { KALIMBA_21 } from '../../src/layout';
-import { kalimbaInstruments } from '../../src/sound/instruments';
-import { clickMessages, Plucks } from '../../src/sound/plucks';
-import { DEFAULT_KLANG, instrumentsWith, pitchOffset, ringFactor, type KlangValues } from '../../src/sound/klang';
+import { KALIMBA_21, retune } from '../../src/layout';
+import { KalimbaSound } from '../../src/sound/kalimba-sound';
+import { DEFAULT_KLANG, type KlangValues } from '../../src/sound/klang';
 
 export interface RenderAsk {
   readonly seconds: number;
@@ -17,6 +16,8 @@ export interface RenderAsk {
   readonly messages?: readonly Message[];
   /** the Klang panel's macros, over their defaults */
   readonly klang?: Partial<KlangValues>;
+  /** half steps per tongue, as the Umstimmen mode retunes them */
+  readonly tuning?: readonly number[];
 }
 
 // mulberry32: a seeded draw in [0, 1)
@@ -34,13 +35,13 @@ async function renderKalimba(ask: RenderAsk): Promise<number[]> {
   const sampleRate = ask.sampleRate ?? 48000;
   const context = new OfflineAudioContext(1, Math.round(ask.seconds * sampleRate), sampleRate);
   const klang: KlangValues = { ...DEFAULT_KLANG, ...ask.klang };
-  const { kalimba, click } = kalimbaInstruments(context, context.destination, seeded(ask.seed ?? 1), instrumentsWith(klang));
-  const plucks = new Plucks(() => ({ pitchOffset: pitchOffset(klang), ringFactor: ringFactor(klang) }));
+  const tongues = retune(KALIMBA_21, ask.tuning ?? KALIMBA_21.map(() => 0));
+  const sound = new KalimbaSound({ context, into: context.destination, random: seeded(ask.seed ?? 1), klang, tongues });
   for (const { note, t, velocity } of ask.plucks ?? []) {
-    kalimba.receive(plucks.pluck(KALIMBA_21.find((tongue) => tongue.note === note)!, t, velocity ?? 1));
+    sound.pluck(tongues.find((tongue) => tongue.note === note)!, t, velocity ?? 1);
   }
-  (ask.clicks ?? []).forEach(({ accent, t }, i) => click.receive(clickMessages(accent, t, i)));
-  if (ask.messages) kalimba.receive(ask.messages);
+  for (const { accent, t } of ask.clicks ?? []) sound.click(accent, t);
+  if (ask.messages) sound.receive(ask.messages);
   const rendered = await context.startRendering();
   return Array.from(rendered.getChannelData(0));
 }

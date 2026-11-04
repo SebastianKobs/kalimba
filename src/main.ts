@@ -1,5 +1,5 @@
 import './style.css';
-import { KALIMBA_21 } from './layout';
+import { KALIMBA_21, retune } from './layout';
 import { canvasHighway } from './practice/highway';
 import { mountPractice } from './practice/practice-view';
 import { SONGS } from './songs';
@@ -42,7 +42,7 @@ function saveKlang(values: KlangValues): void {
 }
 
 const klang = loadKlang();
-const sound = new ModularPlayer(klang);
+const sound = new ModularPlayer(klang, retune(KALIMBA_21, loadTuning() ?? KALIMBA_21.map(() => 0)));
 const app = document.querySelector<HTMLElement>('#app')!;
 const practice = mountPractice(app, {
   tongues: KALIMBA_21,
@@ -50,7 +50,10 @@ const practice = mountPractice(app, {
   songs: SONGS,
   highway: canvasHighway,
   tuning: loadTuning(),
-  onTuningChange: saveTuning,
+  onTuningChange: (halfSteps) => {
+    saveTuning(halfSteps);
+    sound.setTongues(retune(KALIMBA_21, halfSteps));
+  },
   metronome: sound,
 });
 // below the kalimba: its sound as a few macros, heard as they move, kept in the browser

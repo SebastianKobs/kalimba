@@ -14,9 +14,10 @@ describe('the kalimba voice card', () => {
   });
 
   it('rings at a tine’s modes: the note, a twin a hair above, weak harmonics, the beam’s bending modes', () => {
-    const ratios = ['tine', 'twin', '2nd', '3rd', 'ping', 'ting'].map(ratio);
-    // the bending modes as a Thomann Sun Kalimba's demo has them (6.5×, 17.3×)
-    const expected = [1, 1.0017, 2, 3, 6.5, 17.3];
+    const ratios = ['tine', 'twin', '2nd', '3rd', '5th', '7th', '9th', 'ping', 'ting'].map(ratio);
+    // the bending modes as a Thomann Sun Kalimba's demo has them (6.5×, 17.3×); the 7th and 9th harmonics a few Cent
+    // sharp, as a stiff tongue stretches its upper partials
+    const expected = [1, 1.0017, 2, 3, 5, 7 * 2 ** (13 / 1200), 9 * 2 ** (19 / 1200), 6.5, 17.3];
     ratios.forEach((r, i) => expect(r).toBeCloseTo(expected[i]!, 4));
   });
 
@@ -32,8 +33,18 @@ describe('the kalimba voice card', () => {
     expect(paramAt(card(), ['tone', 'cutoff'])?.value).toBe(3500);
   });
 
+  it('has grit: a narrow band of noise around the 8th partial, following the note', () => {
+    expect(settingAt(card(), ['grit', 'filter', 'type'])?.value).toBe('bandpass');
+    expect(macroIn(card().node, ['frequency'])!.maps.find((m) => m.to[0] === 'grit')).toMatchObject({ to: ['grit', 'cutoff'], factor: 8 });
+  });
+
+  it('fades its upper partials faster than the note: the dirt sits in the attack', () => {
+    const decay = macroIn(card().node, ['decay time']);
+    expect(decay?.maps.find((m) => m.to[0] === 'upper env')?.factor).toBe(0.4);
+  });
+
   it('damps every partial quickly at the note’s end, as a finger on a tine does', () => {
-    const envelopes = ['ring env', 'harmonics env', 'ping env', 'click env', 'knock env'];
+    const envelopes = ['ring env', 'harmonics env', 'upper env', 'ping env', 'click env', 'knock env'];
     expect(envelopes.map((e) => settingAt(card(), [e, 'envelope', 'mode'])?.value)).toEqual(envelopes.map(() => 'gate'));
     expect(envelopes.map((e) => paramAt(card(), [e, 'release'])?.value)).toEqual(envelopes.map(() => 0.03));
   });
@@ -41,7 +52,7 @@ describe('the kalimba voice card', () => {
   it('rings as long as the note’s decay time says, its harmonics a little shorter', () => {
     const decay = macroIn(card().node, ['decay time']);
     const factors = Object.fromEntries((decay?.maps ?? []).map((m) => [m.to.join('/'), m.factor]));
-    expect(factors).toEqual({ 'ring env/decay': 1, 'harmonics env/decay': 0.7 });
+    expect(factors).toEqual({ 'ring env/decay': 1, 'harmonics env/decay': 0.7, 'upper env/decay': 0.4 });
   });
 });
 

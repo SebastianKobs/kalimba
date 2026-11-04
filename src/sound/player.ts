@@ -1,49 +1,50 @@
-import { NoteRotation } from '../../libs/midi/protocol/index.ts';
 import type { Plucker } from '../kalimba-view';
 import type { Tongue } from '../layout';
-import { kalimbaInstruments, type KalimbaInstruments } from './instruments';
-import { KALIMBA_PATCH } from './kalimba-card';
-import { instrumentsWith, pitchOffset, presetFor, ringFactor, type KlangValues } from './klang';
-import { clickMessages, Plucks } from './plucks';
+import type { KlangValues } from './klang';
+import { KalimbaSound } from './kalimba-sound';
 
 // a pluck is never quite as hard as the last: velocity drawn in this range
 const VELOCITY = [0.85, 1] as const;
 const MASTER_LEVEL = 0.5; // headroom for chords, into the limiter
 
-interface Running extends KalimbaInstruments {
+interface Running {
   readonly context: AudioContext;
+  readonly sound: KalimbaSound;
 }
 
-/** Edge: plays plucks and clicks on stim-garden's modular instruments, built from the kalimba's voice cards. */
+/** Edge: plays the kalimba live: the audio context started on a gesture, a master level into a limiter. */
 export class ModularPlayer implements Plucker {
-  readonly #plucks = new Plucks(() => ({ pitchOffset: pitchOffset(this.#klang), ringFactor: ringFactor(this.#klang) }));
-  readonly #clicks = new NoteRotation();
   #klang: KlangValues;
+  #tongues: readonly Tongue[];
   #running?: Running;
 
-  // klang: the Klang panel's macros as they start, the stored ones
-  constructor(klang: KlangValues) {
+  // klang: the Klang panel's macros as they start; tongues: the kalimba as tuned now
+  constructor(klang: KlangValues, tongues: readonly Tongue[]) {
     this.#klang = klang;
+    this.#tongues = tongues;
   }
 
   pluck(tongue: Tongue): void {
-    const { context, kalimba } = this.#start();
-    const velocity = VELOCITY[0] + (VELOCITY[1] - VELOCITY[0]) * Math.random();
-    kalimba.receive(this.#plucks.pluck(tongue, context.currentTime, velocity));
-  }
-
-  /** The Klang panel's macros changed: the kalimba glides there; Stimmung and Nachklang hold from the next pluck. */
-  setKlang(values: KlangValues): void {
-    this.#klang = values;
-    this.#running?.kalimba.edited(KALIMBA_PATCH, presetFor(values));
+    const { context, sound } = this.#start();
+    sound.pluck(tongue, context.currentTime, VELOCITY[0] + (VELOCITY[1] - VELOCITY[0]) * Math.random());
   }
 
   /** A metronome tick, the first beat of a bar accented. */
   click(accent: boolean): void {
-    const { context, click } = this.#start();
-    const index = this.#clicks.noteOn();
-    this.#clicks.noteOff(index); // its note off goes with it
-    click.receive(clickMessages(accent, context.currentTime, index));
+    const { context, sound } = this.#start();
+    sound.click(accent, context.currentTime);
+  }
+
+  /** The Klang panel's macros changed: heard at once on what rings, from the next pluck on the rest. */
+  setKlang(values: KlangValues): void {
+    this.#klang = values;
+    this.#running?.sound.setKlang(values);
+  }
+
+  /** The tongues retuned: the other tongues ring along at their new pitches. */
+  setTongues(tongues: readonly Tongue[]): void {
+    this.#tongues = tongues;
+    this.#running?.sound.setTongues(tongues);
   }
 
   /** Starts the audio on a user gesture, so the first pluck sounds at once. */
@@ -63,7 +64,8 @@ export class ModularPlayer implements Plucker {
     limiter.threshold.value = -6;
     limiter.ratio.value = 12;
     level.connect(limiter).connect(context.destination);
-    this.#running = { context, ...kalimbaInstruments(context, level, Math.random, instrumentsWith(this.#klang)) };
+    const sound = new KalimbaSound({ context, into: level, random: Math.random, klang: this.#klang, tongues: this.#tongues });
+    this.#running = { context, sound };
     return this.#running;
   }
 }

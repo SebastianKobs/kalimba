@@ -11,19 +11,31 @@ instruments:
       # 17.3×, as the demo has them; a free cantilever's would be 6.27× and 17.55×)
       - { name: tine, kind: VCO, role: source, values: { level: 0.45 } }
       - { name: twin, kind: VCO, role: source, values: { level: 0.12, tune: 0.03 } }
-      # levels as a Thomann Sun Kalimba's sound demo measures (Hann-windowed): the 2nd harmonic around −55 dB,
-      # the 3rd far below, nearly a pure tone; the 6.5× mode about 28 dB under the note in the attack, the
-      # 17.3× one about 70 dB
-      - { name: 2nd, kind: VCO, role: source, values: { level: 0.001 } }
-      - { name: 3rd, kind: VCO, role: source, values: { level: 0.0001 } }
-      - { name: ping, kind: VCO, role: source, values: { level: 0.08 } }
-      - { name: ting, kind: VCO, role: source, values: { level: 0.006 } }
+      # levels from a Thomann Sun Kalimba's sound demo (Hann-windowed), then raised by ear 1.63× (the Klang panel's
+      # Obertöne at 163 %, now its 100 %): the 2nd harmonic around −52 dB, the 3rd −58, the 5th −64; the 6.5× mode
+      # about 24 dB under the note in the attack, the 17.3× one about 66 dB
+      - { name: 2nd, kind: VCO, role: source, values: { level: 0.00163 } }
+      - { name: 3rd, kind: VCO, role: source, values: { level: 0.00082 } }
+      - { name: 5th, kind: VCO, role: source, values: { level: 0.00041 } }
+      # a real tine's dirt in its upper partials: the 7th and 9th harmonics, quieter as they go up and a few Cent
+      # sharp, as a stiff tongue stretches them, so they beat against the clean ones; and grit, a narrow band of
+      # noise around the 8th partial, following the note. They fade faster than the note: the dirt sits in the attack
+      # (by ear: Obertöne 163 % and Rauheit 162 % of the first guess, now their 100 %)
+      - { name: 7th, kind: VCO, role: source, values: { level: 0.00049, tune: 0.13 } }
+      - { name: 9th, kind: VCO, role: source, values: { level: 0.00033, tune: 0.19 } }
+      - name: grit
+        kind: Noise source
+        role: source
+        values: { level: 0.0148, resonance: 4 }
+        settings: { filter/type: bandpass, noise/loop: on }
+      - { name: ping, kind: VCO, role: source, values: { level: 0.13 } }
+      - { name: ting, kind: VCO, role: source, values: { level: 0.0098 } }
       # the thumb releasing the tine: bright noise, its buffer's offset drawn per voice, so no two plucks
       # click alike
       - name: click
         kind: Noise source
         role: source
-        values: { cutoff: 3000, level: 0.25 }
+        values: { cutoff: 3000, level: 0.385 } # by ear: the Klang panel's Anschlag at 154 %, now its 100 %
         settings: { filter/type: highpass }
       # the box: a short wooden knock at a fixed 240 Hz, whatever the note
       - { name: knock, kind: VCO, role: source, values: { frequency: 240, level: 0.08 } }
@@ -39,6 +51,11 @@ instruments:
         role: modulator
         values: { attack: 0.001, sustain: 0, release: 0.03 }
         settings: { envelope/mode: gate }
+      - name: upper env
+        kind: Envelope generator
+        role: modulator
+        values: { attack: 0.001, sustain: 0, release: 0.03 }
+        settings: { envelope/mode: gate }
       - name: ping env
         kind: Envelope generator
         role: modulator
@@ -47,7 +64,7 @@ instruments:
       - name: click env
         kind: Envelope generator
         role: modulator
-        values: { attack: 0.0003, decay: 0.02, sustain: 0, release: 0.03 }
+        values: { attack: 0.0003, decay: 0.031, sustain: 0, release: 0.03 }
         settings: { envelope/mode: gate }
       - name: knock env
         kind: Envelope generator
@@ -56,6 +73,7 @@ instruments:
         settings: { envelope/mode: gate }
       - { name: ring vca, kind: VCA, role: stage, values: { gain: 0 } }
       - { name: harmonics vca, kind: VCA, role: stage, values: { gain: 0 } }
+      - { name: upper vca, kind: VCA, role: stage, values: { gain: 0 } }
       - { name: ping vca, kind: VCA, role: stage, values: { gain: 0 } }
       - { name: click vca, kind: VCA, role: stage, values: { gain: 0 } }
       - { name: knock vca, kind: VCA, role: stage, values: { gain: 0 } }
@@ -72,17 +90,23 @@ instruments:
       - { from: { node: twin, output: out }, to: { node: ring vca, input: in } }
       - { from: { node: 2nd, output: out }, to: { node: harmonics vca, input: in } }
       - { from: { node: 3rd, output: out }, to: { node: harmonics vca, input: in } }
+      - { from: { node: 5th, output: out }, to: { node: harmonics vca, input: in } }
+      - { from: { node: 7th, output: out }, to: { node: upper vca, input: in } }
+      - { from: { node: 9th, output: out }, to: { node: upper vca, input: in } }
+      - { from: { node: grit, output: out }, to: { node: upper vca, input: in } }
       - { from: { node: ping, output: out }, to: { node: ping vca, input: in } }
       - { from: { node: ting, output: out }, to: { node: ping vca, input: in } }
       - { from: { node: click, output: out }, to: { node: click vca, input: in } }
       - { from: { node: knock, output: out }, to: { node: knock vca, input: in } }
       - { from: { node: ring env, output: out }, to: { node: ring vca, param: gain } }
       - { from: { node: harmonics env, output: out }, to: { node: harmonics vca, param: gain } }
+      - { from: { node: upper env, output: out }, to: { node: upper vca, param: gain } }
       - { from: { node: ping env, output: out }, to: { node: ping vca, param: gain } }
       - { from: { node: click env, output: out }, to: { node: click vca, param: gain } }
       - { from: { node: knock env, output: out }, to: { node: knock vca, param: gain } }
       - { from: { node: ring vca, output: out }, to: { node: tone, input: in } }
       - { from: { node: harmonics vca, output: out }, to: { node: tone, input: in } }
+      - { from: { node: upper vca, output: out }, to: { node: tone, input: in } }
       - { from: { node: ping vca, output: out }, to: { node: tone, input: in } }
       # the click beside the lowpass: Helligkeit darkens the tine, the thumb still clicks
       - { from: { node: click vca, output: out }, to: { node: out, input: in } }
@@ -99,12 +123,17 @@ instruments:
           - { to: [twin, frequency], factor: 1, offset: 0 }
           - { to: [2nd, frequency], factor: 2, offset: 0 }
           - { to: [3rd, frequency], factor: 3, offset: 0 }
+          - { to: [5th, frequency], factor: 5, offset: 0 }
+          - { to: [7th, frequency], factor: 7, offset: 0 }
+          - { to: [9th, frequency], factor: 9, offset: 0 }
+          - { to: [grit, cutoff], factor: 8, offset: 0 }
           - { to: [ping, frequency], factor: 6.5, offset: 0 }
           - { to: [ting, frequency], factor: 17.3, offset: 0 }
       - name: gate
         maps:
           - { to: [ring env, gate], factor: 1, offset: 0 }
           - { to: [harmonics env, gate], factor: 1, offset: 0 }
+          - { to: [upper env, gate], factor: 1, offset: 0 }
           - { to: [ping env, gate], factor: 1, offset: 0 }
           - { to: [click env, gate], factor: 1, offset: 0 }
           - { to: [knock env, gate], factor: 1, offset: 0 }
@@ -112,6 +141,7 @@ instruments:
         maps:
           - { to: [ring env, velocity], factor: 1, offset: 0 }
           - { to: [harmonics env, velocity], factor: 1, offset: 0 }
+          - { to: [upper env, velocity], factor: 1, offset: 0 }
           - { to: [ping env, velocity], factor: 1, offset: 0 }
           - { to: [click env, velocity], factor: 1, offset: 0 }
           - { to: [knock env, velocity], factor: 1, offset: 0 }
@@ -121,6 +151,7 @@ instruments:
         maps:
           - { to: [ring env, decay], factor: 1, offset: 0 }
           - { to: [harmonics env, decay], factor: 0.7, offset: 0 }
+          - { to: [upper env, decay], factor: 0.4, offset: 0 }
   # the metronome's click: a short blip, its pitch and loudness the note's (higher and louder on a bar's first beat)
   Metronome click:
     children:
