@@ -11,7 +11,7 @@ REPO="${STIM_GARDEN:-$HOME/git/stim-garden-idea}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # the libraries the kalimba's sound reaches (worked out from their imports)
 LIBS="base/automation base/params base/util midi/protocol music/music-theory sequencing/clock
-modular-audio/plan/format modular-audio/plan/blocks modular-audio/plan/planner modular-audio/plan/instrument
+modular-audio/plan/format modular-audio/plan/blocks modular-audio/plan/planner modular-audio/plan/instrument modular-audio/plan/effects
 modular-audio/build/contract modular-audio/build/web-audio modular-audio/build/web-audio-engine modular-audio/build/instrument"
 
 FULL="$(git -C "$REPO" rev-parse --verify "$COMMIT^{commit}")"

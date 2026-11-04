@@ -1,0 +1,30 @@
+# The Limiter, as Ableton's on the master: its gain into it, in dB, held at its ceiling, in dBFS.
+# Its gain, ceiling and release macros onto the limiter's, their specs theirs.
+kind: Limiter
+form: effect
+inputs: [{ name: in, channels: 2 }]
+outputs: [{ name: out, channels: 2 }]
+children:
+  - { name: limiter, kind: limiter }
+wires:
+  - { from: { input: in }, to: { node: limiter, input: in } }
+  - { from: { node: limiter, output: out }, to: { output: out } }
+# Its values Ableton's to start: no gain, a ceiling of -0.3 dBFS, a release of 0.3 s.
+macros:
+  - name: gain
+    value: 0
+    hint: >-
+      The limiter: how much it lifts the sum before it, in dB. Each dB more is a dB louder, until it
+      reaches the ceiling, which holds it.
+    maps: [{ to: [limiter, gain], factor: 1, offset: 0 }]
+  - name: ceiling
+    value: -0.3
+    hint: >-
+      The limiter: where it acts, in dBFS, and the most that comes out, whatever goes in. The line in its
+      history.
+    maps: [{ to: [limiter, ceiling], factor: 1, offset: 0 }]
+  - name: release
+    value: 0.3
+    hint: >-
+      The limiter: how quickly it lets go, in seconds, once what went past the ceiling is gone.
+    maps: [{ to: [limiter, release], factor: 1, offset: 0 }]

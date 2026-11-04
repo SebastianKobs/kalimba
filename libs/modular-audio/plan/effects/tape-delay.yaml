@@ -1,0 +1,25 @@
+# The Tape delay, after Czukay's tape echo: the Delay, its line's time wobbling a few
+# milliseconds either way, as a tape's speed does.
+# Built on the Delay: its line, lowpass and loop, its macros; only the wobble written here.
+#   1. a slow oscillator, the wobble;
+#   2. its depth, a gain;
+#   3. into the line's time, by its ms.
+# A signal into a delay's time moves its line in seconds, as Web Audio's does:
+# a depth of 0.004 moves it 4 ms either way, though the wire names its ms.
+kind: TapeDelay
+label: Tape delay
+extends: Delay
+children:
+  - { name: wobble, kind: oscillator }
+  - { name: depth, kind: gain }
+wires:
+  - { from: { node: wobble, output: out }, to: { node: depth, input: in } }
+  - { from: { node: depth, output: out }, to: { node: line, param: ms } }
+# its rate and depth knobs, an LFO's, not an oscillator's or a fader's
+macros:
+  - name: rate
+    spec: { unit: Hz, range: [0.05, 5, 0.01], default: 0.5, taper: octaves }
+    maps: [{ to: [wobble, frequency], factor: 1, offset: 0 }]
+  - name: depth
+    spec: { unit: s, range: [0, 0.02, 0.0005], default: 0.004 }
+    maps: [{ to: [depth, gain], factor: 1, offset: 0 }]

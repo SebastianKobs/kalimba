@@ -1,0 +1,24 @@
+# The Utility, as Ableton's: a gain, then a pan.
+# Its level and its pan macros onto the two's, their specs theirs: the level the fader's, in dB.
+# Its pan's law a setting: stereo, a mono sound made stereo first, as the mixer's pans are;
+# a pan pot where a preset says so (pan/law), a mono sound panned as it comes.
+kind: Utility
+form: effect
+inputs: [{ name: in, channels: 2 }]
+outputs: [{ name: out, channels: 2 }]
+children:
+  - { name: gain, kind: gain }
+  - { name: pan, kind: pan }
+wires:
+  - { from: { input: in }, to: { node: gain, input: in } }
+  - { from: { node: gain, output: out }, to: { node: pan, input: in } }
+  - { from: { node: pan, output: out }, to: { output: out } }
+macros:
+  - name: level
+    hint: >-
+      Its gain, in dB, as Ableton's Utility's. A desk strip's is the level the desk gives it, before a
+      channel's fader, after an FX channel's chain: its fader at unity plays at it.
+    maps: [{ to: [gain, gain], factor: 1, offset: 0 }]
+  - name: pan
+    hint: Where it sits, left −1 to right 1, as Ableton's Utility's balance.
+    maps: [{ to: [pan, pan], factor: 1, offset: 0 }]

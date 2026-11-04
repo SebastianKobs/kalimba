@@ -4,10 +4,11 @@ import { buildingIn } from '../../libs/modular-audio/build/web-audio-engine/inde
 import { NoteRotation, type Message } from '../../libs/midi/protocol/index.ts';
 import type { Tongue } from '../layout';
 import { CLICK_PATCH, KALIMBA_PATCH } from './kalimba-card';
-import { instrumentsWith, pitchOffset, presetFor, resonanceGain, ringFactor, type KlangValues } from './klang';
+import { hallGain, instrumentsWith, pitchOffset, presetFor, resonanceGain, ringFactor, type KlangValues } from './klang';
 import { clickMessages, Plucks } from './plucks';
 import { excitationFor, resonatorsFor } from './resonance';
 import { ResonanceBank } from './resonance-bank';
+import { roomPlan } from './room';
 
 // tines ring up to ~6 s: a fast run needs more voices than a synth's 16
 const POLYPHONY = 24;
@@ -15,7 +16,7 @@ const POLYPHONY = 24;
 export interface KalimbaSoundMaking {
   readonly context: BaseAudioContext;
   readonly into: AudioNode;
-  /** the noise's draws: the click's offsets, the bridge's knock */
+  /** the noise's draws: the click's offsets, the room's impulse */
   readonly random: () => number;
   readonly klang: KlangValues;
   readonly tongues: readonly Tongue[];
@@ -23,7 +24,7 @@ export interface KalimbaSoundMaking {
 
 /**
  * Edge: the kalimba's whole sound in one context, the same for the live player and an offline render: the tine and
- * click instruments (built from their voice cards), the plucks, the other tongues ringing along.
+ * click instruments (built from their voice cards), the plucks, the other tongues ringing along, a small room.
  */
 export class KalimbaSound {
   readonly #kalimba: Instrument<AudioNode>;
@@ -31,19 +32,28 @@ export class KalimbaSound {
   readonly #plucks: Plucks;
   readonly #clicks = new NoteRotation();
   readonly #bank: ResonanceBank;
+  readonly #roomSend: GainNode;
   #klang: KlangValues;
   #tongues: readonly Tongue[];
 
   constructor({ context, into, random, klang, tongues }: KalimbaSoundMaking) {
     this.#klang = klang;
     this.#tongues = tongues;
-    const building = buildingIn({ context, into, at: (t) => t, beat: () => 0.5, buffers: new Buffers(context, random) });
+    // everything into a bus: straight on, and through a send into a small room, back into the same output
+    const bus = context.createGain();
+    bus.connect(into);
+    this.#roomSend = context.createGain();
+    bus.connect(this.#roomSend);
+    const buffers = new Buffers(context, random);
+    const building = (where: AudioNode) => buildingIn({ context, into: where, at: (t) => t, beat: () => 0.5, buffers });
+    building(into).builder.build(roomPlan(), { into, from: { in: this.#roomSend } });
     const instruments = instrumentsWith(klang);
-    const instrument = (patch: string) => new Instrument({ instruments, patch, ...building, polyphony: () => POLYPHONY });
-    this.#kalimba = instrument(KALIMBA_PATCH);
-    this.#click = instrument(CLICK_PATCH);
+    const instrument = (patch: string, where: AudioNode) =>
+      new Instrument({ instruments, patch, ...building(where), polyphony: () => POLYPHONY });
+    this.#kalimba = instrument(KALIMBA_PATCH, bus);
+    this.#click = instrument(CLICK_PATCH, into); // the metronome dry: a click in a room blurs the beat
     this.#plucks = new Plucks(() => ({ pitchOffset: pitchOffset(this.#klang), ringFactor: ringFactor(this.#klang) }));
-    this.#bank = new ResonanceBank(context, into, random);
+    this.#bank = new ResonanceBank(context, bus);
     this.#setBank();
   }
 
@@ -80,5 +90,6 @@ export class KalimbaSound {
   #setBank(): void {
     const klang = this.#klang;
     this.#bank.set(resonatorsFor(this.#tongues, ringFactor(klang), pitchOffset(klang)), resonanceGain(klang));
+    this.#roomSend.gain.value = hallGain(klang);
   }
 }

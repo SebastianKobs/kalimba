@@ -1,0 +1,22 @@
+# The Filter: a lowpass, wide open to start, flat at its cutoff.
+# Its cutoff and its q macros onto the filter's frequency and resonance, their specs theirs.
+# Its slope a setting (filter/slope), 12 dB an octave unless a preset says 24.
+kind: Filter
+label: LP filter
+form: effect
+inputs: [{ name: in, channels: 2 }]
+outputs: [{ name: out, channels: 2 }]
+children:
+  - { name: filter, kind: filter }
+wires:
+  - { from: { input: in }, to: { node: filter, input: in } }
+  - { from: { node: filter, output: out }, to: { output: out } }
+macros:
+  - name: cutoff
+    hint: >-
+      Its cutoff, in hertz: the sound above it is taken away, so a lower cutoff sounds duller.
+    maps: [{ to: [filter, frequency], factor: 1, offset: 0 }]
+  - name: q
+    hint: >-
+      Resonance: how much it rings at its cutoff, as an EQ's Q: 0.707 flat, more a bump there.
+    maps: [{ to: [filter, resonance], factor: 1, offset: 0 }]

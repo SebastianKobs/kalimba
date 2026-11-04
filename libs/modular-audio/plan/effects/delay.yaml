@@ -1,0 +1,32 @@
+# The Delay: a delay line with a lowpass in its loop, so every repeat is darker than the last.
+#   1. its sound into the line;
+#   2. the line into the lowpass, and out;
+#   3. the lowpass back into the line through the loop's gain, its feedback.
+# Its time with a sync switch, as Ableton's: synced, a note value at the tempo; free, in ms.
+# Its feedback and its tone specs written here: no block has them.
+# Its feedback 0.45 and its tone 2400 Hz to start: each repeat a little quieter and darker.
+kind: Delay
+form: effect
+inputs: [{ name: in, channels: 2 }]
+outputs: [{ name: out, channels: 2 }]
+children:
+  - { name: line, kind: delay }
+  # its lowpass a small bump at its tone: Web Audio's own Q, 1 dB, as a ratio
+  - { name: lowpass, kind: filter, values: { resonance: 1.122 } }
+  - { name: loop, kind: gain }
+wires:
+  - { from: { input: in }, to: { node: line, input: in } }
+  - { from: { node: line, output: out }, to: { node: lowpass, input: in } }
+  - { from: { node: lowpass, output: out }, to: { node: loop, input: in } }
+  - { from: { node: loop, output: out }, to: { node: line, input: in } }
+  - { from: { node: lowpass, output: out }, to: { output: out } }
+macros:
+  - { name: sync, maps: [{ to: [line, sync], factor: 1, offset: 0 }] }
+  - { name: note, maps: [{ to: [line, note], factor: 1, offset: 0 }] }
+  - { name: ms, maps: [{ to: [line, ms], factor: 1, offset: 0 }] }
+  - name: feedback
+    spec: { range: [0, 0.95, 0.01], default: 0.45 }
+    maps: [{ to: [loop, gain], factor: 1, offset: 0 }]
+  - name: tone
+    spec: { unit: Hz, range: [100, 12000, 10], default: 2400 }
+    maps: [{ to: [lowpass, frequency], factor: 1, offset: 0 }]

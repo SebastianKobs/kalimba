@@ -13,6 +13,7 @@ export type MacroName =
   | 'koerper'
   | 'schwebung'
   | 'resonanz'
+  | 'hall'
   | 'stimmung'
   | 'nachklang';
 export type KlangValues = Readonly<Record<MacroName, number>>;
@@ -102,6 +103,14 @@ export const MACROS: readonly Macro[] = [
     format: percent,
   },
   {
+    name: 'hall',
+    label: 'Hall',
+    hint: 'Ein kleiner Raum um die Kalimba: wie viel davon zu hören ist.',
+    range: [0, 3, 0.01],
+    default: 1,
+    format: percent,
+  },
+  {
     name: 'stimmung',
     label: 'Stimmung',
     hint: 'Die ganze Kalimba höher oder tiefer, in Cent: 100 Cent sind ein Halbton.',
@@ -159,6 +168,14 @@ const RESONANCE_AT_100 = 100 * 10 ** ((-0.07 * 30) / 20);
 /** Resonanz: the gain of the other tongues ringing along, scaled as the other sliders scale their levels. */
 export function resonanceGain(values: KlangValues): number {
   return RESONANCE_AT_100 * values.resonanz;
+}
+
+// Hall at 100 %: the send into the room, half the first one (0.3), as set by ear
+const HALL_AT_100 = 0.15;
+
+/** Hall: the gain of the send into the room. */
+export function hallGain(values: KlangValues): number {
+  return HALL_AT_100 * values.hall;
 }
 
 /** Stimmung: every note's pitch moved, in semitones. */

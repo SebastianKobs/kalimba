@@ -1,0 +1,13 @@
+# The Reverb: a room, its impulse response so many seconds of noise, darker as it decays.
+# Its length a setting of its own, the room's (room/length): a change builds it again.
+kind: Reverb
+form: effect
+inputs: [{ name: in, channels: 2 }]
+outputs: [{ name: out, channels: 2 }]
+children:
+  - { name: room, kind: reverb }
+wires:
+  - { from: { input: in }, to: { node: room, input: in } }
+  - { from: { node: room, output: out }, to: { output: out } }
+settings:
+  - { name: length, to: [room, length] }

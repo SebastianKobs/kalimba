@@ -1,13 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { RenderAsk } from './render';
-import { amplitudeAt, at, brightness, db, estimateFrequency, levelDb, spreadAroundFade } from './measure';
+import { amplitudeAt, at, brightness, db, estimateFrequency, levelDb, rms, spreadAroundFade } from './measure';
 
 // the kalimba rendered offline in Firefox, through the same instruments the player plays
 async function render(page: Page, ask: RenderAsk): Promise<number[]> {
   return page.evaluate((a) => window.renderKalimba(a), ask);
 }
+// dry unless asked: the tests of the tine measure the tine, the room has tests of its own
 const pluck = (page: Page, note: string, seconds: number, extra: Partial<RenderAsk> = {}) =>
-  render(page, { seconds, plucks: [{ note, t: 0 }], ...extra });
+  render(page, { seconds, plucks: [{ note, t: 0 }], ...extra, klang: { hall: 0, ...extra.klang } });
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/test/e2e/render.html');
@@ -77,8 +78,9 @@ test.describe('the dirt in the upper partials', () => {
   };
 
   test('the 7th and 9th harmonics ring a few Cent sharp, quieter as they go up', async ({ page }) => {
-    const samples = await pluck(page, 'C4', 0.4, { klang: { resonanz: 0 } });
-    const [seventh, ninth] = [partial(samples, 7), partial(samples, 9)];
+    const samples = await pluck(page, 'C4', 0.5, { klang: { resonanz: 0 } });
+    // a long window: the grit's noise lies on these partials, averaged out better against their steady tone
+    const [seventh, ninth] = [partial(samples, 7, 0.05, 0.45), partial(samples, 9, 0.05, 0.45)];
     expect(seventh.cents).toBeCloseTo(13, -0.5); // within 1.6 Cent of the 0.2 % steps
     expect(ninth.cents).toBeCloseTo(19, -0.5);
     expect(seventh.level).toBeGreaterThan(-68);
@@ -137,7 +139,7 @@ test('a note’s end damps the tine within 50 ms, as a re-pluck does to the note
     { type: 'per-note controller', index: 1, controller: 'decay time', value: 3.3, t: 0 },
     { type: 'note off', index: 1, t: 0.5 },
   ] as RenderAsk['messages'];
-  const samples = await render(page, { seconds: 1, messages });
+  const samples = await render(page, { seconds: 1, messages, klang: { hall: 0 } });
   const [before, after] = [
     db(amplitudeAt(samples, 261.63, 0.4, 0.5)),
     db(amplitudeAt(samples, 261.63, 0.55, 0.65)),
@@ -213,11 +215,11 @@ test.describe('the other tongues ringing along', () => {
 
   // at Resonanz 93 %, as it sounds right by ear (the demo's mix let its octave tongue ring at most −51 dB); a lower
   // tongue rings longer, so narrower, and a knock moves it less
-  test('a pluck sets its neighbours on the bridge ringing along, 30 to 45 dB under the note', async ({ page }) => {
+  test('a pluck sets its neighbours on the bridge ringing along, 25 to 40 dB under the note', async ({ page }) => {
     const samples = await pluck(page, 'C4', 0.6);
     for (const frequency of [A3, E4]) {
-      expect(ringingAlong(samples, frequency)).toBeGreaterThan(-45);
-      expect(ringingAlong(samples, frequency)).toBeLessThan(-30);
+      expect(ringingAlong(samples, frequency)).toBeGreaterThan(-40);
+      expect(ringingAlong(samples, frequency)).toBeLessThan(-25);
     }
   });
 
@@ -259,6 +261,40 @@ test.describe('the other tongues ringing along', () => {
     // D4 plucked: F4's neighbour on the bridge
     const samples = await pluck(page, 'D4', 0.6, { tuning, klang: { resonanz: 1 } });
     expect(ringingAlong(samples, 369.99, 293.66) - ringingAlong(samples, 349.23, 293.66)).toBeGreaterThan(15);
+  });
+});
+
+test.describe('a bit of reverb', () => {
+  // C4 damped at 0.3 s, the halo off: what still sounds after it is the room
+  const damped = (klang: RenderAsk['klang']) => ({
+    seconds: 1.8,
+    klang: { resonanz: 0, ...klang },
+    messages: [
+      { type: 'note on', index: 1, pitch: 60, velocity: 1, t: 0 },
+      { type: 'per-note controller', index: 1, controller: 'decay time', value: 5, t: 0 },
+      { type: 'note off', index: 1, t: 0.3 },
+    ] as RenderAsk['messages'],
+  });
+  const tail = (samples: number[], from = 0.45, to = 0.65) => db(rms(samples, at(from), at(to)) / rms(samples, at(0.1), at(0.3)));
+
+  test('a damped note leaves a short tail of room', async ({ page }) => {
+    const level = tail(await render(page, damped({})));
+    expect(level).toBeGreaterThan(-40);
+    expect(level).toBeLessThan(-15);
+  });
+
+  test('a short room: gone 1.5 s after the damping', async ({ page }) => {
+    expect(tail(await render(page, damped({})), 1.6, 1.8)).toBeLessThan(-70);
+  });
+
+  test('Hall off: dry, nothing after the damping', async ({ page }) => {
+    expect(tail(await render(page, damped({ hall: 0 })))).toBeLessThan(-70);
+  });
+
+  test('Hall 200 %: the tail 6 dB louder', async ({ page }) => {
+    const [normal, double] = [await render(page, damped({})), await render(page, damped({ hall: 2 }))];
+    const room = (samples: number[]) => rms(samples, at(0.45), at(0.65));
+    expect(db(room(double) / room(normal))).toBeCloseTo(6, 0);
   });
 });
 

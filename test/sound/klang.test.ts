@@ -1,14 +1,14 @@
 import { KALIMBA } from '../../src/sound/kalimba-card';
-import { DEFAULT_KLANG, instrumentsWith, KLANG_STORAGE_KEY, MACROS, parseStoredKlang, pitchOffset, presetFor, resonanceGain, ringFactor, type KlangValues } from '../../src/sound/klang';
+import { DEFAULT_KLANG, hallGain, instrumentsWith, KLANG_STORAGE_KEY, MACROS, parseStoredKlang, pitchOffset, presetFor, resonanceGain, ringFactor, type KlangValues } from '../../src/sound/klang';
 
 const values = (changes: Partial<KlangValues>): KlangValues => ({ ...DEFAULT_KLANG, ...changes });
 const preset = (changes: Partial<KlangValues>) => presetFor(values(changes)).values as Record<string, number>;
 
 describe('the Klang macros', () => {
-  it('are ten, labelled in German', () => {
+  it('are eleven, labelled in German', () => {
     expect(MACROS.map((m) => m.label)).toEqual([
-      'Obertöne', 'Ungerade Obertöne', 'Rauheit', 'Helligkeit', 'Anschlag', 'Körper', 'Schwebung', 'Resonanz', 'Stimmung',
-      'Nachklang',
+      'Obertöne', 'Ungerade Obertöne', 'Rauheit', 'Helligkeit', 'Anschlag', 'Körper', 'Schwebung', 'Resonanz', 'Hall',
+      'Stimmung', 'Nachklang',
     ]);
   });
 
@@ -77,6 +77,13 @@ describe('the Klang macros', () => {
     expect(resonanceGain(values({ resonanz: 2 })) / resonanceGain(DEFAULT_KLANG)).toBeCloseTo(2, 9);
     // 100 % is the halo that sounded right by ear: 93 % of the slider before, on its 30 dB curve to 100
     expect(resonanceGain(DEFAULT_KLANG)).toBeCloseTo(100 * 10 ** ((-0.07 * 30) / 20), 6);
+  });
+
+  it('Hall sends the kalimba into a small room: none at 0, twice at 200 %', () => {
+    expect(hallGain(values({ hall: 0 }))).toBe(0);
+    expect(hallGain(values({ hall: 2 })) / hallGain(DEFAULT_KLANG)).toBeCloseTo(2, 9);
+    expect(DEFAULT_KLANG.hall).toBe(1);
+    expect(hallGain(DEFAULT_KLANG)).toBeCloseTo(0.15, 9); // 100 %: half the first room's send, by ear
   });
 
   it('Stimmung moves every note in cents; Nachklang scales how long they ring', () => {

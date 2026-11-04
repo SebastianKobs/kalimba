@@ -1,7 +1,8 @@
 import type { Resonator } from './resonance';
 
-// the bridge's knock when a tongue is plucked: a short burst of noise into every resonator
-const KNOCK_SECONDS = 0.01;
+// the bridge's knock when a tongue is plucked: one impulse, as strong at every pitch, so each resonator rings by its
+// coupling alone, the same every time; as loud on average as the 1.5 ms noise burst it replaces, which a random
+// draw made louder at some pitches than others
 const KNOCK_DECAY_SECONDS = 0.0015;
 
 /**
@@ -14,16 +15,13 @@ export class ResonanceBank {
   readonly #filters: BiquadFilterNode[] = [];
   readonly #knock: AudioBuffer;
 
-  // random: the knock's noise, drawn once
-  constructor(context: BaseAudioContext, into: AudioNode, random: () => number) {
+  constructor(context: BaseAudioContext, into: AudioNode) {
     this.#context = context;
     this.#output = context.createGain();
     this.#output.connect(into);
-    this.#knock = context.createBuffer(1, Math.round(KNOCK_SECONDS * context.sampleRate), context.sampleRate);
-    const samples = this.#knock.getChannelData(0);
-    for (let i = 0; i < samples.length; i++) {
-      samples[i] = (random() * 2 - 1) * Math.exp(-i / context.sampleRate / KNOCK_DECAY_SECONDS);
-    }
+    this.#knock = context.createBuffer(1, 1, context.sampleRate);
+    // a uniform noise's power is ⅓; over a decay of τ it sums to ⅓ · fs τ / 2
+    this.#knock.getChannelData(0)[0] = Math.sqrt((context.sampleRate * KNOCK_DECAY_SECONDS) / 6);
   }
 
   /** Each tongue's resonator, as tuned now, and how loud the bank rings. */
