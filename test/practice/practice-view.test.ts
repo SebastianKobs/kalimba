@@ -576,6 +576,21 @@ describe('mountPractice', () => {
       expect(targets()).toEqual(['F4']);
     });
 
+    it('plays again from the start in the new way when it changes while a song runs; stopped, it starts nothing', () => {
+      const { q, set, start, view, targets } = setup();
+      set('mode', 'wait');
+      set('text', 'key: G\n1 2 3 4 5 6 7 1′ 3″');
+      set('transpose', '5');
+      expect(targets()).toEqual([]); // nothing running: nothing started
+      start();
+      view.tick(10);
+      expect(targets()).toEqual(['F4']);
+      set('transpose', '-7');
+      view.tick(10);
+      expect(q('[role="status"]').textContent).toMatch(/eine Quinte tiefer/);
+      expect(targets()).toEqual(['F3']); // an octave under the quarter up: from its first note again
+    });
+
     it('offers nothing while the text has no notes', () => {
       const { q, set } = setup();
       set('text', 'just words');
@@ -621,6 +636,28 @@ describe('mountPractice', () => {
       expect(q('.tuning').textContent).toBe('Stimmung: Standard-C');
       expect(options(q)).not.toContain('Zurück zu Standard-C');
       expect(options(q).at(-1)).toMatch(/^Umstimmen/); // and the retuning offered again
+    });
+
+    it('plays a running song again on the retuned kalimba, as written', () => {
+      const { set, start, view, targets } = setup();
+      set('mode', 'wait');
+      set('text', 'D4 E4 F#4 G4');
+      start();
+      view.tick(10);
+      expect(targets()).toEqual(['C4']); // moved onto the C tongues
+      set('transpose', 'retune');
+      view.tick(10);
+      expect(targets()).toEqual(['D4']); // retuned: as written
+    });
+
+    it('puts the kalimba back in its standard tuning when another song is chosen: a retuning belongs to its song', () => {
+      const { q, set, savedTunings } = setup();
+      set('text', 'D4 E4 F#4 G4 A4 B4 C#5 D5');
+      set('transpose', 'retune');
+      expect(savedTunings.at(-1)!.some((h) => h !== 0)).toBe(true);
+      set('song', '1');
+      expect(savedTunings.at(-1)).toEqual(KALIMBA_21.map(() => 0));
+      expect(q('.tuning').textContent).toBe('Stimmung: Standard-C');
     });
 
     it('offers no retuning for a song the tongues already play in its key', () => {

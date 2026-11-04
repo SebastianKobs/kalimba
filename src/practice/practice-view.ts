@@ -391,10 +391,13 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     transposeSelect.disabled = options.length === 0;
   };
 
-  // chosen, the retuning is made at once: the tongues as it says, the song then as written
+  // chosen, the retuning is made at once: the tongues as it says, the song then as written;
+  // a song running plays again from its start, the new way
   transposeSelect.addEventListener('change', () => {
+    const playing = session !== undefined && !session.finished;
     if (transposeSelect.value === RETUNE && retuning) applyTuning([...retuning.halfSteps], retuningHome);
     if (transposeSelect.value === STANDARD) applyTuning(halfSteps.map(() => 0));
+    if (playing) start();
   });
 
   // a meter outside the list, such as 7/4, joins it
@@ -524,7 +527,11 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
 
   const beatsPerMinute = () => Number(tempoInput.value);
 
-  songSelect.addEventListener('change', showSong);
+  // a retuning belongs to the song it was made for: another song starts on the standard tongues
+  songSelect.addEventListener('change', () => {
+    showSong();
+    if (halfSteps.some((h) => h !== 0)) applyTuning(halfSteps.map(() => 0));
+  });
   textArea.addEventListener('input', () => {
     showText();
     takeHeadersFromText();
