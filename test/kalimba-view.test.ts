@@ -125,7 +125,9 @@ describe('mountKalimba', () => {
     expect(root.querySelector('.engraving')!.getAttribute('aria-hidden')).toBe('true');
     handle.setTongues(retune(KALIMBA_21, KALIMBA_21.map((t) => (t.note === 'F3' ? 1 : 0))));
     expect(said()).toBe('Stimmung: Standard-C mit 4\u0323 erhöht von F auf F#');
-    expect(engraved()).toEqual(['Standard-C', '4\u0323  F → F#']);
+    expect(engraved()).toEqual(['Standard-C', '4\u0323  F → F#']); // one F of three: no scale
+    handle.setTongues(retune(KALIMBA_21, KALIMBA_21.map((t) => (t.letter === 'F' ? 1 : 0))), 4); // all F raised, a song at home on E
+    expect(engraved()[0]).toBe('E-Moll');
   });
 
   it('has a reset screw on the body, live only while a tongue is retuned', () => {

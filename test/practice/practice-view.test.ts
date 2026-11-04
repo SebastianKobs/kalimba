@@ -560,6 +560,7 @@ describe('mountPractice', () => {
         'eine Quinte tiefer (7 Halbtöne) · passt am besten',
         'eine Quarte höher (5 Halbtöne) · 1 Note um eine Oktave versetzt',
         'eine Oktave und eine Quarte höher (17 Halbtöne) · 2 Noten um eine Oktave versetzt',
+        'Umstimmen: F → F# · wie notiert', // or the kalimba in G, last
       ]);
       expect(q<HTMLSelectElement>('[name="transpose"]').value).toBe('-7');
     });
@@ -583,6 +584,52 @@ describe('mountPractice', () => {
     });
   });
 
+  describe('retune instead of transposing', () => {
+    const options = (q: ReturnType<typeof setup>['q']) => [...q<HTMLSelectElement>('[name="transpose"]').options].map((o) => o.text);
+
+    it('offers to retune the kalimba for a song in another key; chosen, it retunes and plays the song as written', () => {
+      const { q, set, savedTunings } = setup();
+      set('text', 'D4 E4 F#4 G4 A4 B4 C#5 D5');
+      expect(options(q)).toContain('Umstimmen: C → C#, F → F# · wie notiert');
+      set('transpose', 'retune');
+      const raised = KALIMBA_21.filter((_, i) => savedTunings.at(-1)![i] === 1).map((t) => t.letter);
+      expect([...new Set(raised)].sort()).toEqual(['C', 'F']);
+      expect(options(q)[0]).toBe('wie notiert · passt am besten');
+      expect(options(q).some((o) => o.startsWith('Umstimmen'))).toBe(false); // tuned so now: nothing left to offer
+      expect(q('.tuning').textContent).toMatch(/^Stimmung: D-Dur \(/); // the song ends on D
+    });
+
+    it('names the scale by where the song comes home: its key line, else its last note', () => {
+      const { q, set } = setup();
+      set('text', 'G4 F#4 E4 B3 E4'); // G major's notes, home on E
+      set('transpose', 'retune');
+      expect(q('.tuning').textContent).toMatch(/^Stimmung: E-Moll \(/);
+      q<HTMLButtonElement>('.tuning-reset').click();
+      set('text', 'key: G\nG4 F#4 E4 B3 E4');
+      set('transpose', 'retune');
+      expect(q('.tuning').textContent).toMatch(/^Stimmung: G-Dur \(/);
+    });
+
+    it('offers the way back to the standard tuning in the same list, once retuned', () => {
+      const { q, set, savedTunings } = setup();
+      set('text', 'D4 E4 F#4 G4 A4 B4 C#5 D5');
+      expect(options(q)).not.toContain('Zurück zu Standard-C');
+      set('transpose', 'retune');
+      expect(options(q).at(-1)).toBe('Zurück zu Standard-C');
+      set('transpose', 'standard');
+      expect(savedTunings.at(-1)).toEqual(KALIMBA_21.map(() => 0));
+      expect(q('.tuning').textContent).toBe('Stimmung: Standard-C');
+      expect(options(q)).not.toContain('Zurück zu Standard-C');
+      expect(options(q).at(-1)).toMatch(/^Umstimmen/); // and the retuning offered again
+    });
+
+    it('offers no retuning for a song the tongues already play in its key', () => {
+      const { q, set } = setup();
+      set('text', 'C4 E4 G4');
+      expect(options(q).some((o) => o.startsWith('Umstimmen'))).toBe(false);
+    });
+  });
+
   describe('retune', () => {
     const F_TONGUES = ['F3', 'F4', 'F5'];
     const raisedF = KALIMBA_21.map((t) => (F_TONGUES.includes(t.note) ? 1 : 0));
@@ -602,7 +649,7 @@ describe('mountPractice', () => {
     it('starts from a saved tuning and says which tongues are retuned', () => {
       const { root, q } = setup(raisedF);
       expect(notes(root).filter((n) => n?.includes('#'))).toEqual(['F#4', 'F#3', 'F#5']);
-      expect(q('.tuning').textContent).toBe('Stimmung: Standard-C mit 4\u0323, 4 und 4′ erhöht von F auf F#');
+      expect(q('.tuning').textContent).toBe('Stimmung: G-Dur (Standard-C mit 4\u0323, 4 und 4′ erhöht von F auf F#)');
     });
 
     it('fits songs to the retuned tongues: a G major tab plays as written with the F tongues raised', () => {

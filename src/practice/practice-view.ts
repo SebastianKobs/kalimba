@@ -2,6 +2,7 @@ import { mountKalimba, type KalimbaHandle, type Plucker } from '../kalimba-view'
 import { retune, type Tongue } from '../layout';
 import { arrange, transposeOptions, type ArrangedNote, type Arrangement, type TransposeOption } from '../music/arrange';
 import { describeShift } from '../music/interval';
+import { homeNoteOf, tuningFor, type TuningOption } from '../music/retune-for';
 import { DEFAULT_TEMPO, keyOf, meterOf, parseSong, SongTextError, tempoOf, titleOf, type IgnoredText, type Meter, type SourceRange } from '../music/notation';
 import { clicksBetween } from './metronome';
 import { PracticeSession, type PracticeMode } from './session';
@@ -200,6 +201,14 @@ function describeFit(name: string, a: Arrangement): string {
   return parts.join(' · ');
 }
 
+// the transpose menu's entries for retuning the kalimba instead, and for its standard tuning again
+const RETUNE = 'retune';
+const STANDARD = 'standard';
+
+function describeRetuning(option: TuningOption): string {
+  return `Umstimmen: ${option.changes.map((c) => `${c.letter} → ${c.to}`).join(', ')} · ${describeShift(option.transpose)}`;
+}
+
 function describeOption(option: TransposeOption, best: boolean): string {
   const parts = [describeShift(option.transpose)];
   if (option.folded > 0) parts.push(`${noteCount(option.folded)} um eine Oktave versetzt`);
@@ -289,6 +298,8 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const nameInput = field<HTMLInputElement>('import-name');
   const keySelect = field<HTMLSelectElement>('import-key');
   const transposeSelect = field<HTMLSelectElement>('transpose');
+  let retuning: TuningOption | undefined; // what the transpose menu offers instead of moving the song
+  let retuningHome: number | undefined; // and where that song comes home
   const tabView = panel.querySelector<HTMLElement>('.tab-view')!;
   let tabMarks = new Map<number, HTMLElement>();
   let highlighted: HTMLElement[] = [];
@@ -358,18 +369,33 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const selectedSong = () => songs[Number(songSelect.value)];
 
   // offered afresh whenever the text changes; the player's pick is used at Start
+  // the song moved onto the tongues; or, where that plays more of it in its own key, the tongues retuned to the song
   const offerTranspositions = () => {
     let options: TransposeOption[] = [];
+    retuning = undefined;
     try {
-      options = transposeOptions(parseSong(textArea.value, { tongues }), tongues);
+      const song = parseSong(textArea.value, { tongues });
+      options = transposeOptions(song, tongues);
+      retuning = tuningFor(song, tongues);
+      retuningHome = homeNoteOf(song, keyOf(textArea.value));
     } catch (e) {
       if (!(e instanceof SongTextError)) throw e;
     }
-    transposeSelect.innerHTML = options
-      .map((o, i) => `<option value="${o.transpose}">${escapeHtml(describeOption(o, i === 0))}</option>`)
-      .join('');
+    const retuneOption = retuning ? `<option value="${RETUNE}">${escapeHtml(describeRetuning(retuning))}</option>` : '';
+    // retuned, the way back is in the same list: not everyone finds the screw
+    const standardOption = halfSteps.some((h) => h !== 0) ? `<option value="${STANDARD}">Zurück zu Standard-C</option>` : '';
+    transposeSelect.innerHTML =
+      options.map((o, i) => `<option value="${o.transpose}">${escapeHtml(describeOption(o, i === 0))}</option>`).join('') +
+      retuneOption +
+      standardOption;
     transposeSelect.disabled = options.length === 0;
   };
+
+  // chosen, the retuning is made at once: the tongues as it says, the song then as written
+  transposeSelect.addEventListener('change', () => {
+    if (transposeSelect.value === RETUNE && retuning) applyTuning([...retuning.halfSteps], retuningHome);
+    if (transposeSelect.value === STANDARD) applyTuning(halfSteps.map(() => 0));
+  });
 
   // a meter outside the list, such as 7/4, joins it
   const setMeter = (meter: Meter | string) => {
@@ -524,10 +550,11 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   field<HTMLButtonElement>('format-help').addEventListener('click', () => formatHelp.showModal());
   wireOverlay(formatHelp, 'format-help-close');
   // a song fitted to the old tuning no longer fits: stop it and offer new transpositions
-  const applyTuning = (next: number[]) => {
+  // home: where the song it's retuned for comes home, to name the scale; by hand, none
+  const applyTuning = (next: number[], home?: number) => {
     halfSteps = next;
     tongues = retune(config.tongues, halfSteps);
-    kalimba.setTongues(tongues);
+    kalimba.setTongues(tongues, home);
     stop();
     offerTranspositions();
     config.onTuningChange?.(halfSteps);

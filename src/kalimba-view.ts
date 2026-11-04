@@ -14,8 +14,8 @@ export interface KalimbaHandle {
   markMiss(tongue: Tongue): void;
   /** the tongue elements, left to right, for aligning things with them */
   readonly tongueElements: readonly HTMLElement[];
-  /** relabel after retuning; same tongues in the same places */
-  setTongues(tongues: readonly Tongue[]): void;
+  /** relabel after retuning; same tongues in the same places. home: the pitch class a song retuned for comes home on, naming its scale */
+  setTongues(tongues: readonly Tongue[], home?: number): void;
   unmount(): void;
 }
 
@@ -101,11 +101,12 @@ export function mountKalimba(
   engraving.setAttribute('aria-hidden', 'true');
   board.append(...elements, resetScrew, said, engraving);
   root.append(board);
+  let home: number | undefined;
   const showTuning = () => {
     resetScrew.disabled = tongues.every((t) => t.tuning === 0);
-    said.textContent = describeTuning(tongues);
+    said.textContent = describeTuning(tongues, home);
     engraving.title = said.textContent; // the whole of it, where the wood shows only part
-    engraving.replaceChildren(...engravedTuning(tongues).map((line) => Object.assign(doc.createElement('span'), { textContent: line })));
+    engraving.replaceChildren(...engravedTuning(tongues, home).map((line) => Object.assign(doc.createElement('span'), { textContent: line })));
   };
   showTuning();
   resetScrew.addEventListener('click', () => options.onResetTuning?.());
@@ -163,8 +164,9 @@ export function mountKalimba(
     },
     markMiss: (tongue) => flash(elements[tongue.index], 'miss'),
     tongueElements: elements,
-    setTongues(next) {
+    setTongues(next, songHome) {
       tongues = next;
+      home = songHome;
       next.forEach((tongue, i) => labelTongue(elements[i], tongue));
       showTuning();
     },
