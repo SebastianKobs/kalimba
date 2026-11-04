@@ -76,15 +76,22 @@ export function canvasHighway(canvas: HTMLCanvasElement, kalimba: KalimbaHandle)
         lane: cssColour(canvas, '--lane', '#ffffff14'),
         grid: cssColour(canvas, '--grid', '#ffffff10'),
         bar: cssColour(canvas, '--bar', '#ffffff40'),
-        hit: cssColour(canvas, '--accent', '#ffcf6b'),
-        exact: cssColour(canvas, '--note', '#ffcf6b'),
-        folded: cssColour(canvas, '--note-octave', '#8fd3ff'),
-        label: cssColour(canvas, '--note-label', '#1c1c1c'),
-        octaveMark: cssColour(canvas, '--octave', '#1a4fa0'),
+        hit: cssColour(canvas, '--hit-line', '#000000'),
+        exact: cssColour(canvas, '--note', '#c0394f'),
+        folded: cssColour(canvas, '--note-octave', '#edb8bf'),
+      };
+      // each kind of note its own ink: light on the rose red, dark on the pale rose
+      const ink = {
+        exact: { label: cssColour(canvas, '--note-label', '#ffffff'), octave: cssColour(canvas, '--note-mark', '#ffd0d7') },
+        folded: { label: cssColour(canvas, '--note-octave-label', '#3a1018'), octave: cssColour(canvas, '--note-octave-mark', '#8a1c30') },
       };
 
       ctx.fillStyle = colours.lane;
-      lanes.forEach((l) => ctx.fillRect(l.centre - l.width / 2, 0, l.width, height));
+      lanes.forEach((l) => {
+        ctx.beginPath();
+        ctx.roundRect(l.centre - l.width / 2, 0, l.width, height, [6, 6, 0, 0]);
+        ctx.fill();
+      });
       ctx.fillStyle = colours.hit;
       ctx.fillRect(0, hitY - 1, width, 2);
       if (!session) return;
@@ -111,7 +118,7 @@ export function canvasHighway(canvas: HTMLCanvasElement, kalimba: KalimbaHandle)
         ctx.beginPath();
         ctx.roundRect(lane.centre - lane.width * 0.45, y - NOTE_HEIGHT / 2, lane.width * 0.9, NOTE_HEIGHT, 6);
         ctx.fill();
-        drawNoteLabel(ctx, note.tongue, lane.centre, y, { label: colours.label, octave: colours.octaveMark });
+        drawNoteLabel(ctx, note.tongue, lane.centre, y, note.fit === 'exact' ? ink.exact : ink.folded);
       }
     },
   };

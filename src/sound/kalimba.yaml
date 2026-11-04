@@ -26,16 +26,17 @@ instruments:
       - name: grit
         kind: Noise source
         role: source
-        values: { level: 0.0148, resonance: 4 }
+        # from anywhere in its looped noise: two notes at once don't grit alike
+        values: { level: 0.0148, resonance: 4, offset: 2 }
         settings: { filter/type: bandpass, noise/loop: on }
       - { name: ping, kind: VCO, role: source, values: { level: 0.13 } }
       - { name: ting, kind: VCO, role: source, values: { level: 0.0098 } }
-      # the thumb releasing the tine: bright noise, its buffer's offset drawn per voice, so no two plucks
-      # click alike
+      # the thumb releasing the tine: bright noise from anywhere in its first 1.75 s, drawn per voice, so no two plucks
+      # click alike and a chord's clicks add up as separate thumbs (one noise twice would be 6 dB louder, not 3)
       - name: click
         kind: Noise source
         role: source
-        values: { cutoff: 3000, level: 0.385 } # by ear: the Klang panel's Anschlag at 154 %, now its 100 %
+        values: { cutoff: 3000, level: 0.385, offset: 1.75 } # level by ear: the Klang panel's Anschlag at 154 %, now its 100 %
         settings: { filter/type: highpass }
       # the box: a short wooden knock at a fixed 240 Hz, whatever the note
       - { name: knock, kind: VCO, role: source, values: { frequency: 240, level: 0.08 } }
@@ -143,8 +144,12 @@ instruments:
           - { to: [harmonics env, velocity], factor: 1, offset: 0 }
           - { to: [upper env, velocity], factor: 1, offset: 0 }
           - { to: [ping env, velocity], factor: 1, offset: 0 }
-          - { to: [click env, velocity], factor: 1, offset: 0 }
           - { to: [knock env, velocity], factor: 1, offset: 0 }
+      # the click's own strength, as MIDI 2.0's per-note brightness (a harder thumb, a brighter attack): the pluck's
+      # velocity, a thumb never quite as hard twice
+      - name: brightness
+        maps:
+          - { to: [click env, velocity], factor: 1, offset: 0 }
       # the note's own decay time (MIDI's per-note controller), which the kalimba sets by pitch:
       # low tines ring longer
       - name: decay time

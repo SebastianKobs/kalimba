@@ -56,8 +56,8 @@ const practice = mountPractice(app, {
   },
   metronome: sound,
 });
-// below the kalimba: its sound as a few macros, heard as they move, kept in the browser
-mountKlangPanel(app, {
+// a drawer hidden in the kalimba: its sound as a few macros, heard as they move, kept in the browser
+mountKlangPanel(app.querySelector<HTMLElement>('.stage')!, {
   values: klang,
   onChange: (values) => {
     sound.setKlang(values);

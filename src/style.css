@@ -1,25 +1,46 @@
+/* Waldboden · Rosenrot · Rostkirsche: a dark forest green, rose red for what to press, the kalimba in rust cherry */
 :root {
-  --bg: #2a1d14;
-  --text: #f3e9dc;
-  --muted: #c9b8a3;
-  --wood-light: #c08a52;
-  --wood-dark: #8a5a30;
-  --bridge: #3b3b3b;
+  --bg: #101a14;
+  --panel: #18241d;
+  --field: #101a14;
+  --line: #2b3c32;
+  --text: #f1e8e4;
+  --muted: #b3bba8;
+  --accent: #c0394f;        /* Start, sliders, the tongue to play */
+  --accent-ink: #ffffff;    /* text on it */
+  --accent-soft: #e0707f;   /* an outline in it */
+  --glow: #c0394f4d;
+  /* the highway: lanes, beat and bar lines, the line notes land on; notes at their pitch in rose red, folded an octave in pale rose */
+  --lane: #18241d;
+  --grid: #ffffff10;
+  --bar: #ffffff30;
+  --hit-line: #060c08;
+  --note: #c0394f;
+  --note-label: #ffffff;
+  --note-mark: #ffd0d7;
+  --note-octave: #edb8bf;
+  --note-octave-label: #3a1018;
+  --note-octave-mark: #8a1c30;
+  --miss: #ff6b6b;
+  /* the kalimba: rust cherry, brass, steel tongues */
+  --wood-light: #bf7243;
+  --wood-dark: #7a3d1f;
+  --wood-lines: #3a140533;
+  --wood-sheen: #ffd8b850;
+  --wood-edge: #ffffff30;
+  --wood-inside-top: #4a2412;
+  --wood-inside-bottom: #6a341a;
+  --wood-label: #f3d6c2;
+  --wood-value: #fff3ea;
+  --brass-light: #d9b26a;
+  --brass: #b88a45;
+  --brass-dark: #7c5a28;
   --tine-light: #f4f6f8;
   --tine-dark: #9aa3ab;
   --tine-label: #1c1c1c;
-  --accent: #ffcf6b;
-  --max-tongue: min(34vh, 360px);
-  --note: #ffcf6b;
-  --note-octave: #8fd3ff;
-  --note-label: #1c1c1c;
-  --miss: #ff6b6b;
   --retuned: #b3261e;
-  --octave: #1a4fa0;
-  --lane: #ffffff0d;
-  --grid: #ffffff14;
-  --bar: #ffffff45;
-  --panel: #00000033;
+  --octave: #1a4fa0;        /* octave marks on the steel */
+  --max-tongue: min(34vh, 360px);
   color-scheme: dark;
 }
 
@@ -30,16 +51,17 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, sans-serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px;
+  padding: 24px 16px 48px;
 }
 
-header { text-align: center; max-width: 60ch; }
-h1 { font-size: 1.4rem; margin: 0.25rem 0; }
-header p { color: var(--muted); font-size: 0.9rem; }
+header { text-align: center; max-width: 70ch; margin-bottom: 10px; }
+h1 { font-size: 1.6rem; margin: 0 0 6px; letter-spacing: 0.01em; }
+h1 .key { color: var(--muted); font-weight: 400; }
+header p { color: var(--muted); font-size: 0.9rem; margin: 0; }
 kbd {
   border: 1px solid var(--muted);
   border-radius: 3px;
@@ -47,91 +69,114 @@ kbd {
   font-size: 0.85em;
 }
 
-#app { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#app { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
 
-.practice { width: min(100%, 1100px); }
-/* sized to its longest option it would push Start onto another row */
-.controls select[name="transpose"] { max-width: 19em; }
-.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: center; }
-.controls label { display: flex; gap: 6px; align-items: center; font-size: 0.9rem; color: var(--muted); }
-.controls select, .controls button {
+.practice { width: min(100%, 1100px); display: flex; flex-direction: column; gap: 14px; }
+
+/* a panel: a group of controls on its own ground */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+
+/* a field: its name small above it, every field the same height */
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+/* a select is as wide as its longest option: held to its field, so a long transposition never widens the row or the page */
+.field select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.field select, .field input[type="text"], .song-text textarea {
   font: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--muted);
-  border-radius: 6px;
-  padding: 4px 8px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
-.controls button { cursor: pointer; padding: 4px 16px; }
-.controls button[name="start"] { background: var(--accent); color: var(--tine-label); border-color: var(--accent); font-weight: 600; }
-.controls output { min-width: 4ch; font-variant-numeric: tabular-nums; }
-.controls .click-toggle { cursor: pointer; }
-.controls .click-toggle input { accent-color: var(--accent); width: 1.1em; height: 1.1em; }
-.song-text { margin-top: 8px; font-size: 0.85rem; color: var(--muted); }
-.song-text textarea, .import-row input, .import-row select {
-  font: inherit;
+.field select, .field input[type="text"] { height: 40px; padding: 0 12px; }
+.field select:focus-visible, .field input:focus-visible, .song-text textarea:focus-visible, button:focus-visible, .click-toggle:focus-within {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+input[type="range"], input[type="checkbox"] { accent-color: var(--accent); }
+
+/* buttons: Start the one filled; the rest outlined */
+button { font: inherit; cursor: pointer; }
+.controls button, .tuning-row button {
+  height: 40px;
+  padding: 0 18px;
   color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--muted);
-  border-radius: 6px;
-  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-weight: 600;
 }
-.song-text textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 0.85rem; resize: vertical; }
+.controls button:hover, .tuning-row button:hover, .import-row button:hover { border-color: var(--accent-soft); }
+.controls button[name="start"] { height: 44px; padding: 0 30px; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; box-shadow: 0 4px 14px var(--glow); }
+.controls button[name="stop"] { height: 44px; }
+
+/* playing: song, mode and transposing; then tempo, meter, click and the buttons */
+.controls { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-end; }
+.controls .break { flex-basis: 100%; height: 0; }
+.controls .song { flex: 2 1 260px; }
+.controls .mode { flex: 1 1 200px; }
+.controls .transpose { flex: 1 1 220px; }
+.controls .tempo { flex: 2 1 280px; }
+.controls .tempo span { display: flex; align-items: center; gap: 12px; height: 40px; }
+.controls .tempo input { flex: 1; }
+.controls .meter { flex: 0 1 110px; }
+.controls output { color: var(--text); font-size: 0.95rem; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; min-width: 4.5em; }
+.controls .click-toggle { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--text); font-size: 0.95rem; cursor: pointer; }
+.controls .click-toggle input { width: 18px; height: 18px; margin: 0; }
+.controls .actions { display: flex; gap: 10px; margin-left: auto; }
+
+/* the song text: the tab as written, or while it plays the same text with the played part marked */
+.song-text { display: flex; flex-direction: column; gap: 12px; }
+.song-text h2 { margin: 0; font-size: 0.75rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.song-text textarea, .tab-view { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.875rem; line-height: 1.6; }
+.song-text textarea { width: 100%; padding: 10px 14px; resize: vertical; }
 .tab-view {
   margin: 0;
   position: relative; /* offsetTop of the highlighted note is measured from here */
-  box-sizing: border-box;
   overflow-y: auto;
   white-space: pre-wrap;
-  font-family: ui-monospace, monospace;
-  font-size: 0.85rem;
   color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--muted);
-  border-radius: 6px;
-  padding: 4px 8px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
 }
-.tab-note.now { background: var(--accent); color: var(--tine-label); border-radius: 3px; box-shadow: 0 0 0 2px var(--accent); }
-.import-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-top: 4px; }
-.import-row label { display: flex; gap: 6px; align-items: center; }
-.import-row button {
-  font: inherit;
-  color: var(--tine-label);
-  background: var(--text);
-  border: none;
-  border-radius: 6px;
-  padding: 4px 16px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.help summary { cursor: pointer; }
-.help p { margin: 4px 0 0; }
-.status { min-height: 1.3em; margin: 6px 0 0; text-align: center; font-size: 0.9rem; }
-.tuning-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: center; margin-top: 8px; font-size: 0.85rem; color: var(--muted); }
-.tuning-row button {
-  font: inherit;
-  color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--muted);
-  border-radius: 6px;
-  padding: 2px 12px;
-  cursor: pointer;
-}
-.tuning-row button[aria-pressed="true"] { background: var(--accent); color: var(--tine-label); border-color: var(--accent); font-weight: 600; }
+.tab-note.now { background: var(--accent); color: var(--accent-ink); border-radius: 4px; box-shadow: 0 0 0 2px var(--accent); }
+.import-row { display: flex; flex-wrap: wrap; gap: 12px 14px; align-items: flex-end; }
+.import-row .field { flex: 1 1 220px; }
+.import-row button { height: 40px; padding: 0 20px; color: var(--text); background: transparent; border: 1px solid var(--accent-soft); border-radius: 8px; font-weight: 600; }
+.help { flex-basis: 100%; font-size: 0.85rem; color: var(--muted); }
+.help summary { cursor: pointer; color: var(--accent-soft); width: max-content; }
+.help p { margin: 6px 0 0; }
+
+/* what's going on, and the tuning, on one line under the panels */
+.status-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 0 4px; }
+.status { min-height: 1.3em; margin: 0; font-size: 0.9rem; }
+.tuning-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 0.9rem; color: var(--muted); }
+.tuning-row button { height: 36px; padding: 0 14px; font-weight: 400; }
+.tuning-row button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.tuning { color: var(--text); }
 .kalimba.retuning .tongue { cursor: cell; }
 .tongue.retuned .letter, .tongue.retuned .cipher { color: var(--retuned); }
 /* octave marks are easy to overlook: bigger, heavier, own colour */
 .tongue .octave { font-size: 1.6em; font-weight: 900; line-height: 0.6; margin-left: 1px; color: var(--octave); }
-.skipped { margin: 2px 0 0; text-align: center; color: var(--muted); font-size: 0.8rem; }
+.skipped { margin: 0; color: var(--muted); font-size: 0.8rem; }
 .skipped:empty { display: none; }
-.error { margin: 0; text-align: center; color: var(--miss); font-size: 0.9rem; }
+.error { margin: 0; color: var(--miss); font-size: 0.9rem; }
 .error:empty { display: none; }
 
 /* stage width follows the kalimba, so the highway lanes sit over the tongues; the body is centred, never stretched */
-.stage { display: inline-flex; flex-direction: column; align-items: center; max-width: 100%; }
+.stage { display: inline-flex; flex-direction: column; align-items: center; max-width: 100%; padding-top: 6px; }
 /* canvas out of flow: its bitmap (width × devicePixelRatio) must not widen the stage, or it grows every frame */
-.highway-box { position: relative; align-self: stretch; height: 21vh; min-height: 140px; }
+.highway-box { position: relative; align-self: stretch; height: 21vh; min-height: 140px; margin-bottom: 14px; }
 .highway { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* wood: its grain (fibres from noise, a few long lines), its sheen, over the board's own light-to-dark */
+.kalimba, .drawer-front, .klang {
+  --grain-lines: repeating-linear-gradient(179.2deg, transparent 0 9px, var(--wood-lines) 9px 10px, transparent 10px 23px, var(--wood-lines) 23px 25px, transparent 25px 41px);
+}
 
 .kalimba {
   --gap: clamp(2px, 0.6vw, 6px);
@@ -140,8 +185,13 @@ kbd {
   gap: var(--gap);
   padding: 28px clamp(10px, 3vw, 36px) 40px;
   border-radius: 18px 18px 48% 48% / 18px 18px 22% 22%;
-  background: radial-gradient(ellipse at 50% 30%, var(--wood-light), var(--wood-dark));
-  box-shadow: 0 10px 40px #0008, inset 0 2px 0 #fff3;
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 26%, var(--wood-sheen), transparent 70%),
+    url('./wood-grain.svg') 0 0 / 100% 100% no-repeat,
+    var(--grain-lines),
+    linear-gradient(180deg, var(--wood-light), var(--wood-dark));
+  background-blend-mode: normal, multiply, normal, normal;
+  box-shadow: 0 10px 40px #000a, inset 0 2px 0 var(--wood-edge), inset 0 -6px 14px #0004;
   position: relative;
   touch-action: none;
   user-select: none;
@@ -149,7 +199,7 @@ kbd {
   max-width: 100%;
 }
 
-/* bridge bar the tongues hang from */
+/* brass bridge bar the tongues hang from */
 .kalimba::before {
   content: '';
   position: absolute;
@@ -158,8 +208,8 @@ kbd {
   top: 18px;
   height: 14px;
   border-radius: 4px;
-  background: var(--bridge);
-  box-shadow: 0 2px 4px #0006;
+  background: linear-gradient(180deg, var(--brass-light), var(--brass) 45%, var(--brass-dark));
+  box-shadow: 0 2px 4px #0006, inset 0 1px 0 #fff5;
   z-index: 1;
 }
 
@@ -181,7 +231,7 @@ kbd {
   transform-origin: 50% 0;
 }
 
-.tongue:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tongue:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
 .tongue .key { margin-top: 6px; font-size: 0.75em; opacity: 0.55; font-weight: 400; }
 
 .tongue.target { box-shadow: 0 0 0 3px var(--accent), 0 0 18px var(--accent); }

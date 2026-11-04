@@ -13,15 +13,25 @@ export interface PluckShape {
 }
 const AS_WRITTEN: PluckShape = { pitchOffset: 0, ringFactor: 1 };
 
+/** How far a pluck's click may stray from its velocity, either way, in dB: a thumb never quite as hard twice. */
+export const CLICK_SPREAD_DB = 2;
+
+// a draw in [0, 1) as a factor on the click: 0.5 as the pluck, 0 and 1 the spread's ends
+function clickSpread(draw: number): number {
+  return 10 ** (((draw * 2 - 1) * CLICK_SPREAD_DB) / 20);
+}
+
 export class Plucks {
   readonly #rotation = new NoteRotation();
   readonly #shape: () => PluckShape;
+  readonly #draw: () => number;
   // per tongue place: its sounding note's index and when it has rung
   readonly #ringing = new Map<number, { index: number; until: number }>();
 
-  // shape: read at each pluck, so a change in the panel holds from the next
-  constructor(shape: () => PluckShape = () => AS_WRITTEN) {
+  // shape: read at each pluck, so a change in the panel holds from the next; draw: in [0, 1), one per pluck for its click
+  constructor(shape: () => PluckShape = () => AS_WRITTEN, draw: () => number = () => 0.5) {
     this.#shape = shape;
+    this.#draw = draw;
   }
 
   pluck(tongue: Tongue, t: number, velocity: number): Message[] {
@@ -39,6 +49,7 @@ export class Plucks {
     messages.push(
       { type: 'note on', index, pitch: pitch + pitchOffset, velocity, t },
       { type: 'per-note controller', index, controller: 'decay time', value: decay, t },
+      { type: 'per-note controller', index, controller: 'brightness', value: velocity * clickSpread(this.#draw()), t }, // the click's strength
       { type: 'note off', index, t: t + decay },
     );
     this.#ringing.set(place, { index, until: t + decay });

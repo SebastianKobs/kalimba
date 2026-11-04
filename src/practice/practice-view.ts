@@ -70,34 +70,40 @@ function controlsMarkup(songs: readonly PracticeSong[]): string {
   const songOptions = songs.map(songOption).join('');
   const modeOptions = MODES.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
   return `
-    <div class="controls">
-      <label>Lied <select name="song">${songOptions}</select></label>
-      <label>Modus <select name="mode">${modeOptions}</select></label>
-      <label>Tempo <input type="range" name="tempo" min="20" max="240" step="1" value="${DEFAULT_TEMPO}" />
-        <output name="tempo-value">${DEFAULT_TEMPO} BPM</output></label>
-      <label>Takt <select name="meter">${METERS.map((m) => `<option value="${m}">${m}</option>`).join('')}</select></label>
+    <div class="panel controls" role="group" aria-label="Spielen">
+      <label class="field song">Lied <select name="song">${songOptions}</select></label>
+      <label class="field mode">Modus <select name="mode">${modeOptions}</select></label>
+      <label class="field transpose">Transponieren <select name="transpose"></select></label>
+      <div class="break"></div>
+      <label class="field tempo">Tempo <span><input type="range" name="tempo" min="20" max="240" step="1" value="${DEFAULT_TEMPO}" />
+        <output name="tempo-value">${DEFAULT_TEMPO} BPM</output></span></label>
+      <label class="field meter">Takt <select name="meter">${METERS.map((m) => `<option value="${m}">${m}</option>`).join('')}</select></label>
       <label class="click-toggle"><input type="checkbox" name="click" /> Klick</label>
-      <label>Transponieren <select name="transpose"></select></label>
-      <button type="button" name="start">Start</button>
-      <button type="button" name="stop">Stopp</button>
+      <div class="actions">
+        <button type="button" name="stop">Stopp</button>
+        <button type="button" name="start">Start</button>
+      </div>
     </div>
-    <div class="song-text">
-      <textarea name="text" rows="4" spellcheck="false" aria-label="Liedtext"
+    <div class="panel song-text">
+      <h2>Liedtext</h2>
+      <textarea name="text" rows="6" spellcheck="false" aria-label="Liedtext"
         placeholder="Kalimba-Tab hier einfügen, benennen und Importieren drücken"></textarea>
       <pre class="tab-view" hidden aria-label="Liedtext beim Spielen"></pre>
       <div class="import-row">
-        <label>Name <input type="text" name="import-name" maxlength="${MAX_NAME_LENGTH}" placeholder="z. B. Sweden" /></label>
-        <label>Tab-Stimmung <select name="import-key">${TAB_TUNINGS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
+        <label class="field">Name <input type="text" name="import-name" maxlength="${MAX_NAME_LENGTH}" placeholder="z. B. Sweden" /></label>
+        <label class="field">Tab-Stimmung <select name="import-key">${TAB_TUNINGS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
         <button type="button" name="import">Importieren</button>
         <details class="help"><summary>Tab-Format</summary><p>${FORMAT_HELP}</p></details>
       </div>
     </div>
-    <div class="tuning-row">
-      <button type="button" name="retune" aria-pressed="false">Umstimmen</button>
-      <button type="button" name="retune-reset">Stimmung zurücksetzen</button>
-      <span class="tuning"></span>
+    <div class="status-row">
+      <p class="status" role="status"></p>
+      <div class="tuning-row">
+        <span class="tuning"></span>
+        <button type="button" name="retune" aria-pressed="false">Umstimmen</button>
+        <button type="button" name="retune-reset">Stimmung zurücksetzen</button>
+      </div>
     </div>
-    <p class="status" role="status"></p>
     <p class="skipped"></p>
     <p class="error" role="alert"></p>`;
 }

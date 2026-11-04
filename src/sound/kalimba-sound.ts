@@ -16,7 +16,7 @@ const POLYPHONY = 24;
 export interface KalimbaSoundMaking {
   readonly context: BaseAudioContext;
   readonly into: AudioNode;
-  /** the noise's draws: the click's offsets, the room's impulse */
+  /** the noise's draws: the click's offsets and strength, the room's impulse */
   readonly random: () => number;
   readonly klang: KlangValues;
   readonly tongues: readonly Tongue[];
@@ -45,14 +45,15 @@ export class KalimbaSound {
     this.#roomSend = context.createGain();
     bus.connect(this.#roomSend);
     const buffers = new Buffers(context, random);
-    const building = (where: AudioNode) => buildingIn({ context, into: where, at: (t) => t, beat: () => 0.5, buffers });
+    // one random for the noise, where each click starts in it and how hard: one seed, one render
+    const building = (where: AudioNode) => buildingIn({ context, into: where, at: (t) => t, beat: () => 0.5, buffers, draws: random });
     building(into).builder.build(roomPlan(), { into, from: { in: this.#roomSend } });
     const instruments = instrumentsWith(klang);
     const instrument = (patch: string, where: AudioNode) =>
       new Instrument({ instruments, patch, ...building(where), polyphony: () => POLYPHONY });
     this.#kalimba = instrument(KALIMBA_PATCH, bus);
     this.#click = instrument(CLICK_PATCH, into); // the metronome dry: a click in a room blurs the beat
-    this.#plucks = new Plucks(() => ({ pitchOffset: pitchOffset(this.#klang), ringFactor: ringFactor(this.#klang) }));
+    this.#plucks = new Plucks(() => ({ pitchOffset: pitchOffset(this.#klang), ringFactor: ringFactor(this.#klang) }), random);
     this.#bank = new ResonanceBank(context, bus);
     this.#setBank();
   }

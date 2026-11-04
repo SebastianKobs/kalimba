@@ -1,27 +1,105 @@
-/* The Klang panel: a slider for each macro, in the page's own look. */
-.klang-panel { width: min(100%, 900px); margin-top: 12px; text-align: center; }
-.klang-panel button {
-  font: inherit;
-  font-size: 0.85rem;
-  color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--muted);
-  border-radius: 6px;
-  padding: 4px 14px;
-  cursor: pointer;
+/* The Klang panel as a drawer built into the kalimba: shut, it lies behind the body with only its pull under the belly;
+   pulled, its front slides out from under the belly and the sliders out behind it. */
+.kalimba { z-index: 1; } /* the body over the drawer it hides */
+
+.klang-drawer {
+  --drawer-time: 0.45s;
+  --drawer-ease: cubic-bezier(0.3, 0.7, 0.2, 1); /* quick off the mark, settling as a drawer on its runners */
+  --front-height: 46px;
+  --front-curve: 36px; /* its bottom bowed as the belly is, so no corner shows under it */
+  --tuck: 10px;        /* shut, its lowest point this far inside the belly */
+  position: relative;
+  z-index: 0;
+  align-self: center;
+  width: 70%; /* where the belly is deep enough to hide it */
+  margin-top: calc(-1 * (var(--front-height) + var(--tuck)));
+  display: flex;
+  flex-direction: column;
 }
-.klang {
+
+/* the opening: a grid row from 0fr to 1fr animates to the sliders' own height, whatever it is;
+   shut, hidden once it has slid in, so its sliders aren't seen or reached */
+.klang-tray {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-rows: 0fr;
+  margin: 0 10px; /* the drawer's box, a little inside its front */
+  visibility: hidden;
+  transition: grid-template-rows var(--drawer-time) var(--drawer-ease), visibility 0s linear var(--drawer-time);
+}
+.klang-drawer.open .klang-tray {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows var(--drawer-time) var(--drawer-ease), visibility 0s;
+}
+/* the sliders kept at their bottom edge, so they move out with the front instead of being uncovered in place */
+.klang-slide { min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+
+.klang {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); /* one column when the drawer is narrower */
   gap: 8px 24px;
-  margin-top: 8px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  background: var(--panel);
+  /* its back stays inside the body, as deep as the front was tucked */
+  padding: calc(var(--front-height) + var(--tuck) + 14px) 16px 12px;
+  background:
+    url('../wood-grain.svg') 0 0 / 100% 100% no-repeat,
+    var(--grain-lines),
+    linear-gradient(180deg, var(--wood-inside-top), var(--wood-inside-bottom));
+  background-blend-mode: multiply, normal, normal;
+  box-shadow: inset 1px 0 0 #0005, inset -1px 0 0 #0005;
   text-align: left;
 }
-.klang[hidden] { display: none; }
-.klang label { display: grid; grid-template-columns: 6.5em 1fr 5.5em; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
+.klang label { display: grid; grid-template-columns: 6.5em minmax(3em, 1fr) 4.5em; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--wood-label); }
 .klang input[type="range"] { accent-color: var(--accent); width: 100%; }
-.klang output { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
-.klang button[name="klang-reset"] { justify-self: start; }
+.klang output { color: var(--wood-value); text-align: right; font-variant-numeric: tabular-nums; }
+.klang button[name="klang-reset"] {
+  justify-self: start;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--wood-value);
+  background: transparent;
+  border: 1px solid var(--wood-label);
+  border-radius: 8px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+/* the front: a piece of the body's wood, bowed as its belly, its pull hanging under it */
+.drawer-front {
+  position: relative;
+  height: var(--front-height);
+  padding: 0;
+  border: none;
+  border-radius: 0 0 50% 50% / 0 0 var(--front-curve) var(--front-curve);
+  background:
+    url('../wood-grain.svg') 0 0 / 100% 100% no-repeat,
+    var(--grain-lines),
+    linear-gradient(180deg, var(--wood-light), var(--wood-dark));
+  background-blend-mode: multiply, normal, normal;
+  box-shadow: 0 8px 18px #000a, inset 0 1px 0 var(--wood-edge);
+  cursor: pointer;
+}
+/* the pull: what shows of the drawer shut, a brass lip with its name */
+.drawer-pull {
+  position: absolute;
+  left: 50%;
+  top: calc(100% - 2px);
+  transform: translateX(-50%);
+  width: 92px;
+  height: 28px;
+  padding-top: 11px;
+  border-radius: 0 0 12px 12px;
+  background: linear-gradient(90deg, var(--brass-dark), var(--brass-light) 45%, var(--brass-dark));
+  box-shadow: 0 3px 5px #0007;
+  color: #2a1c0a;
+  font: 600 10px/1 system-ui, sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.drawer-front:hover .drawer-pull { filter: brightness(1.08); }
+.drawer-front:focus-visible { outline: none; }
+.drawer-front:focus-visible .drawer-pull { outline: 2px solid var(--accent-soft); outline-offset: 2px; } /* the front may be hidden: its pull shows the focus */
+
+@media (prefers-reduced-motion: reduce) {
+  .klang-tray, .klang-drawer.open .klang-tray { transition: none; }
+}

@@ -21,15 +21,33 @@ function setup(values: KlangValues = DEFAULT_KLANG) {
 afterEach(() => document.body.replaceChildren());
 
 describe('mountKlangPanel', () => {
-  it('stays closed until its button is pressed, then shows a slider for each macro, labelled in German', () => {
+  it('is a drawer under the kalimba: shut until its front is pulled, then a slider for each macro, labelled in German', () => {
     const { q, root, toggle } = setup();
-    expect(q('[name="klang"]')!.textContent).toBe('Klang bearbeiten');
-    expect(q<HTMLElement>('.klang')!.hidden).toBe(true);
+    const front = q<HTMLButtonElement>('[name="klang"]')!;
+    const drawer = q<HTMLElement>('.klang-drawer')!;
+    expect(front.textContent).toBe('Klang');
+    expect(front.title).toBe('Klang bearbeiten');
+    expect(front.getAttribute('aria-expanded')).toBe('false');
+    expect(drawer.classList.contains('open')).toBe(false);
+    expect(q('.klang')!.closest('[inert]')).not.toBeNull(); // shut: its sliders out of reach of Tab
     toggle();
-    expect(q<HTMLElement>('.klang')!.hidden).toBe(false);
-    expect(q('[name="klang"]')!.textContent).toBe('Klang schließen');
+    expect(front.getAttribute('aria-expanded')).toBe('true');
+    expect(front.title).toBe('Klang schließen');
+    expect(drawer.classList.contains('open')).toBe(true);
+    expect(q('.klang')!.closest('[inert]')).toBeNull();
     expect([...root.querySelectorAll('.klang label .macro-label')].map((l) => l.textContent)).toEqual(MACROS.map((m) => m.label));
     expect(q('input[name="stimmung"]')!.closest('label')!.title).toMatch(/Cent/);
+    toggle();
+    expect(front.getAttribute('aria-expanded')).toBe('false');
+    expect(drawer.classList.contains('open')).toBe(false);
+  });
+
+  it('has its front below its sliders, as a drawer pulled out has', () => {
+    const { q } = setup();
+    const drawer = q('.klang-drawer')!;
+    expect(drawer.lastElementChild).toBe(q('[name="klang"]'));
+    expect(q('[name="klang"] .drawer-pull')!.textContent).toBe('Klang'); // what shows of it, shut
+    expect(q('[name="klang"]')!.getAttribute('aria-controls')).toBe(q('.klang')!.id);
   });
 
   it('shows Helligkeit at 3500 Hz to start', () => {

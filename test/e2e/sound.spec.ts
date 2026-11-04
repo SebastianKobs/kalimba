@@ -157,6 +157,49 @@ test('no two plucks click alike, and one render is the same every time', async (
   expect(again).toEqual(a);
 });
 
+test.describe('the thumb', () => {
+  // the click band: what a 3-sample average leaves out, ~8 kHz up, in a pluck's first 6 ms; the tine's own partials far below it
+  const clickBand = (x: number[], t: number) => {
+    const from = at(t);
+    return Array.from({ length: at(0.006) }, (_, i) => x[from + i] - (x[from + i - 1] + x[from + i] + x[from + i + 1]) / 3);
+  };
+  const power = (band: number[]) => band.reduce((sum, v) => sum + v * v, 0) / band.length;
+  const onsets = Array.from({ length: 8 }, (_, i) => 0.1 + i * 0.5);
+  const dryAlone = { hall: 0, resonanz: 0 };
+
+  test('two tongues plucked together click as two thumbs: about 3 dB over one, not the 6 of one click twice', async ({ page }) => {
+    const notes = ['C5', 'A4', 'F4', 'D5', 'B4', 'G4', 'E5', 'C4'];
+    const one = await render(page, { seconds: 4.2, klang: dryAlone, plucks: onsets.map((t, i) => ({ note: notes[i], t })) });
+    const two = await render(page, {
+      seconds: 4.2,
+      klang: dryAlone,
+      plucks: onsets.flatMap((t, i) => [{ note: notes[i], t }, { note: notes[(i + 3) % 8], t }]),
+    });
+    const mean = (x: number[]) => onsets.reduce((sum, t) => sum + power(clickBand(x, t)), 0) / onsets.length;
+    const louder = 10 * Math.log10(mean(two) / mean(one));
+    expect(louder).toBeGreaterThan(1.5);
+    expect(louder).toBeLessThan(4.5);
+  });
+
+  test('no two clicks in one go alike: each from somewhere else in its noise', async ({ page }) => {
+    const x = await render(page, { seconds: 1.2, klang: dryAlone, plucks: [{ note: 'C5', t: 0.1 }, { note: 'C5', t: 0.6 }] });
+    const [a, b] = [clickBand(x, 0.1), clickBand(x, 0.6)];
+    const correlation = a.reduce((sum, v, i) => sum + v * b[i], 0) / Math.sqrt(power(a) * power(b)) / a.length;
+    expect(correlation).toBeLessThan(0.5);
+  });
+
+  test('its strength spreads a little from pluck to pluck, a few dB, while the tone holds', async ({ page }) => {
+    const times = Array.from({ length: 20 }, (_, i) => 0.1 + i * 0.4);
+    const x = await render(page, { seconds: 8.3, klang: dryAlone, plucks: times.map((t) => ({ note: 'C5', t })) });
+    const clicks = times.map((t) => 10 * Math.log10(power(clickBand(x, t))));
+    const tones = times.map((t) => db(amplitudeAt(x, 523.25, t + 0.05, t + 0.25))); // its window in seconds
+    const range = (v: number[]) => Math.max(...v) - Math.min(...v);
+    expect(range(clicks)).toBeGreaterThan(2);
+    expect(range(clicks)).toBeLessThan(6);
+    expect(range(tones)).toBeLessThan(0.5);
+  });
+});
+
 // how long until 40 dB down, in 50 ms steps
 function fadeTime(samples: number[]): number {
   let t = 0.1;
