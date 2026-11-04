@@ -18,6 +18,7 @@
   --octave: #1a4fa0;
   --lane: #ffffff0d;
   --grid: #ffffff14;
+  --bar: #ffffff45;
   --panel: #00000033;
   color-scheme: dark;
 }
@@ -48,7 +49,9 @@ kbd {
 
 #app { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 
-.practice { width: min(100%, 900px); }
+.practice { width: min(100%, 1100px); }
+/* sized to its longest option it would push Start onto another row */
+.controls select[name="transpose"] { max-width: 19em; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: center; }
 .controls label { display: flex; gap: 6px; align-items: center; font-size: 0.9rem; color: var(--muted); }
 .controls select, .controls button {
@@ -62,6 +65,8 @@ kbd {
 .controls button { cursor: pointer; padding: 4px 16px; }
 .controls button[name="start"] { background: var(--accent); color: var(--tine-label); border-color: var(--accent); font-weight: 600; }
 .controls output { min-width: 4ch; font-variant-numeric: tabular-nums; }
+.controls .click-toggle { cursor: pointer; }
+.controls .click-toggle input { accent-color: var(--accent); width: 1.1em; height: 1.1em; }
 .song-text { margin-top: 8px; font-size: 0.85rem; color: var(--muted); }
 .song-text textarea, .import-row input, .import-row select {
   font: inherit;
@@ -72,6 +77,21 @@ kbd {
   padding: 4px 8px;
 }
 .song-text textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 0.85rem; resize: vertical; }
+.tab-view {
+  margin: 0;
+  position: relative; /* offsetTop of the highlighted note is measured from here */
+  box-sizing: border-box;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.tab-note.now { background: var(--accent); color: var(--tine-label); border-radius: 3px; box-shadow: 0 0 0 2px var(--accent); }
 .import-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-top: 4px; }
 .import-row label { display: flex; gap: 6px; align-items: center; }
 .import-row button {

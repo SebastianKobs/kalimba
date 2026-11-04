@@ -1,5 +1,5 @@
 import type { Tongue } from '../layout';
-import type { Song } from './notation';
+import type { Song, SourceRange } from './notation';
 
 export interface ArrangedNote {
   readonly beat: number;
@@ -7,6 +7,8 @@ export interface ArrangedNote {
   readonly tongue: Tongue;
   /** exact: the transposed pitch has a tongue; octave: played an octave or more away */
   readonly fit: 'exact' | 'octave';
+  /** where the note was written in the song text */
+  readonly source: SourceRange;
 }
 
 export interface SkippedNote {
@@ -53,7 +55,7 @@ function arrangeAt(song: Song, tongues: readonly Tongue[], transpose: number): A
     const key = `${note.beat}:${tongue.index}`;
     if (taken.has(key)) continue;
     taken.add(key);
-    notes.push({ beat: note.beat, beats: note.beats, tongue, fit: exact ? 'exact' : 'octave' });
+    notes.push({ beat: note.beat, beats: note.beats, tongue, fit: exact ? 'exact' : 'octave', source: note.source });
   }
   return { title: song.title, beatsPerMinute: song.beatsPerMinute, lengthBeats: song.lengthBeats, transpose, notes, skipped };
 }

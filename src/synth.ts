@@ -7,6 +7,10 @@ const ATTACK_SECONDS = 0.0003;
 const T60_AT_C4 = 2.5;
 const T60_RANGE = [0.8, 3.5] as const;
 const LN_1000 = Math.log(1000); // T60 = tau × ln(1000)
+// the box: a short wooden knock at a fixed frequency, the same for every tine
+export const BODY_FREQUENCY = 240;
+const BODY_LEVEL = 0.08;
+const BODY_DECAY_SECONDS = 0.025;
 // the thumb releasing the tine: a short burst of bright noise
 const CLICK_LEVEL = 0.25;
 const CLICK_DECAY_SECONDS = 0.002;
@@ -20,9 +24,11 @@ interface Partial {
 function partialsFor(frequency: number): Partial[] {
   const t60 = Math.min(T60_RANGE[1], Math.max(T60_RANGE[0], T60_AT_C4 * Math.sqrt(261.63 / frequency)));
   const tau = t60 / LN_1000;
+  // weak harmonics ring along with the fundamental: a near-pure tone is hard to place by octave
   return [
-    { ratio: 1, amplitude: 0.5, decaySeconds: tau },
-    { ratio: 2, amplitude: 0.05, decaySeconds: tau * 0.4 },
+    { ratio: 1, amplitude: 0.45, decaySeconds: tau },
+    { ratio: 2, amplitude: 0.07, decaySeconds: tau * 0.8 },
+    { ratio: 3, amplitude: 0.03, decaySeconds: tau * 0.6 },
     { ratio: SECOND_MODE_RATIO, amplitude: 0.2, decaySeconds: 0.04 },
     { ratio: THIRD_MODE_RATIO, amplitude: 0.08, decaySeconds: 0.008 },
   ];
@@ -40,7 +46,7 @@ function noise(seed: number): () => number {
   };
 }
 
-/** Mono samples of one plucked tine: a click, then a sum of exponentially decaying sine modes. */
+/** Mono samples of one plucked tine: a click and a knock of the box, then a sum of exponentially decaying sine modes. */
 export function renderTine(frequency: number, sampleRate: number, durationSeconds: number): Float32Array<ArrayBuffer> {
   const samples = new Float32Array(Math.round(sampleRate * durationSeconds));
   const nyquist = sampleRate / 2;
@@ -54,11 +60,26 @@ export function renderTine(frequency: number, sampleRate: number, durationSecond
     for (const p of partials) {
       value += p.amplitude * Math.exp(-t / p.decaySeconds) * Math.sin(2 * Math.PI * p.ratio * frequency * t);
     }
+    value += BODY_LEVEL * Math.exp(-t / BODY_DECAY_SECONDS) * Math.sin(2 * Math.PI * BODY_FREQUENCY * t);
     // differenced noise: high-passed, so the click is bright rather than a thump
     const white = random();
     value += CLICK_LEVEL * Math.exp(-t / CLICK_DECAY_SECONDS) * (white - previousNoise) * 0.5;
     previousNoise = white;
     samples[i] = attack * value;
+  }
+  return samples;
+}
+
+const CLICK_SECONDS = 0.03;
+
+/** A metronome tick: a short decaying blip, higher and louder on the first beat of a bar. */
+export function renderClick(sampleRate: number, accent: boolean): Float32Array<ArrayBuffer> {
+  const samples = new Float32Array(Math.round(sampleRate * CLICK_SECONDS));
+  const [frequency, level] = accent ? [1600, 0.6] : [1000, 0.3];
+  for (let i = 0; i < samples.length; i++) {
+    const t = i / sampleRate;
+    const attack = Math.min(1, t / ATTACK_SECONDS);
+    samples[i] = attack * level * Math.exp(-t / 0.005) * Math.sin(2 * Math.PI * frequency * t);
   }
   return samples;
 }

@@ -75,6 +75,7 @@ export function canvasHighway(canvas: HTMLCanvasElement, kalimba: KalimbaHandle)
       const colours = {
         lane: cssColour(canvas, '--lane', '#ffffff14'),
         grid: cssColour(canvas, '--grid', '#ffffff10'),
+        bar: cssColour(canvas, '--bar', '#ffffff40'),
         hit: cssColour(canvas, '--accent', '#ffcf6b'),
         exact: cssColour(canvas, '--note', '#ffcf6b'),
         folded: cssColour(canvas, '--note-octave', '#8fd3ff'),
@@ -88,11 +89,12 @@ export function canvasHighway(canvas: HTMLCanvasElement, kalimba: KalimbaHandle)
       ctx.fillRect(0, hitY - 1, width, 2);
       if (!session) return;
 
-      // one faint line per beat, so rhythm reads as spacing
+      // one faint line per beat, so rhythm reads as spacing; a stronger one where a bar starts
       const now = session.beat;
-      ctx.fillStyle = colours.grid;
       for (let b = Math.ceil(now); (b - now) * PIXELS_PER_BEAT < height; b++) {
-        ctx.fillRect(0, hitY - (b - now) * PIXELS_PER_BEAT, width, 1);
+        const barStart = ((b % session.beatsPerBar) + session.beatsPerBar) % session.beatsPerBar === 0;
+        ctx.fillStyle = barStart ? colours.bar : colours.grid;
+        ctx.fillRect(0, hitY - (b - now) * PIXELS_PER_BEAT, width, barStart ? 2 : 1);
       }
 
       ctx.textBaseline = 'middle';

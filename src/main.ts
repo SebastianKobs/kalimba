@@ -31,6 +31,7 @@ const practice = mountPractice(document.querySelector<HTMLElement>('#app')!, {
   highway: canvasHighway,
   tuning: loadTuning(),
   onTuningChange: saveTuning,
+  metronome: sound,
 });
 
 // audio may only start after a user gesture; render all tines on the first one

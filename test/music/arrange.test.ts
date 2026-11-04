@@ -48,6 +48,12 @@ describe('arrange', () => {
     expect(played(a)).toEqual(['B4']);
   });
 
+  it('keeps where each note was written', () => {
+    const text = 'D4 F#4';
+    const a = arrange(parseSong(text), KALIMBA_21);
+    expect(a.notes.map((n) => text.slice(n.source.start, n.source.end))).toEqual(['D4', 'F#4']);
+  });
+
   it('keeps timing, tempo and title', () => {
     const a = arrange(parseSong('title: T\ntempo: 60\nC4_ E4 -'), KALIMBA_21);
     expect(a.notes.map((n) => [n.beat, n.beats])).toEqual([[0, 0.5], [0.5, 2]]);

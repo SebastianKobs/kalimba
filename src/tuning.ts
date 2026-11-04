@@ -25,13 +25,13 @@ export function tongueNumber(tongue: Tongue): string {
 }
 
 function listed(items: string[]): string {
-  return items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+  return items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} und ${items.at(-1)}`;
 }
 
-/** "Tuning: Standard C with 4̣, 4 and 4′ raised from F to F#": retuned tongues grouped by change, lowest first. */
+/** "Stimmung: Standard-C mit 4̣, 4 und 4′ erhöht von F auf F#": retuned tongues grouped by change, lowest first. */
 export function describeTuning(tongues: readonly Tongue[]): string {
   const retuned = tongues.filter((t) => t.tuning !== 0).sort((a, b) => a.midi - a.tuning - (b.midi - b.tuning));
-  if (retuned.length === 0) return 'Tuning: Standard C';
+  if (retuned.length === 0) return 'Stimmung: Standard-C';
   const groups = new Map<string, Tongue[]>();
   for (const tongue of retuned) {
     const change = `${tongue.letter}${tongue.tuning}`;
@@ -39,7 +39,7 @@ export function describeTuning(tongues: readonly Tongue[]): string {
   }
   const changes = [...groups.values()].map((group) => {
     const { letter, accidental, tuning } = group[0];
-    return `${listed(group.map(tongueNumber))} ${tuning > 0 ? 'raised' : 'lowered'} from ${letter} to ${letter}${accidental}`;
+    return `${listed(group.map(tongueNumber))} ${tuning > 0 ? 'erhöht' : 'erniedrigt'} von ${letter} auf ${letter}${accidental}`;
   });
-  return `Tuning: Standard C with ${changes.join('; ')}`;
+  return `Stimmung: Standard-C mit ${changes.join('; ')}`;
 }

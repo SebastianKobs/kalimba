@@ -1,9 +1,10 @@
 import { mountKalimba, type KalimbaHandle, type Plucker } from '../kalimba-view';
 import { retune, type Tongue } from '../layout';
 import { describeTuning } from '../tuning';
-import { arrange, transposeOptions, type Arrangement, type TransposeOption } from '../music/arrange';
+import { arrange, transposeOptions, type ArrangedNote, type Arrangement, type TransposeOption } from '../music/arrange';
 import { describeShift } from '../music/interval';
-import { DEFAULT_TEMPO, keyOf, parseSong, SongTextError, tempoOf, titleOf, type IgnoredText } from '../music/notation';
+import { DEFAULT_TEMPO, keyOf, meterOf, parseSong, SongTextError, tempoOf, titleOf, type IgnoredText, type Meter } from '../music/notation';
+import { clicksBetween } from './metronome';
 import { PracticeSession, type PracticeMode } from './session';
 
 export interface PracticeSong {
@@ -26,6 +27,8 @@ export interface PracticeConfig {
   /** half steps per tongue, -1, 0 or 1; validated by the caller */
   readonly tuning?: readonly number[];
   onTuningChange?(halfSteps: readonly number[]): void;
+  /** plays the click; the first beat of a bar is accented */
+  readonly metronome?: { click(accent: boolean): void };
 }
 
 export interface PracticeView {
@@ -35,26 +38,28 @@ export interface PracticeView {
 }
 
 const MODES: readonly [PracticeMode, string][] = [
-  ['wait', 'Wait for me: step by step'],
-  ['play-along', 'Play along: keeps time'],
-  ['listen', 'Listen: the kalimba plays it'],
+  ['wait', 'Warten: Schritt für Schritt'],
+  ['play-along', 'Mitspielen: im Takt'],
+  ['listen', 'Anhören: die Kalimba spielt'],
 ];
 
 const FORMAT_HELP =
-  'Paste a kalimba tab or write your own. Notes: kalimba numbers like on the tongues (1 = C4 … 7 = B4) or letters (C, F#, Bb, or C5 with an octave). ' +
-  "Octave up: ' ′ * ° or a dot above, doubled (or ″ \") for two; octave down: , or a dot below. " +
-  'Played together: ( ) or [ ], e.g. (1 3 5), (135), (5-7), [C E G]. A - after a note holds it a beat longer: 2-4 is 2 for two beats, then 4. ' +
-  'Rhythm: one beat per note at the tempo slider; _ halves, . adds half, 0 rests. ' +
-  'Headers: "title: …", "tempo: 90" (sets the slider) and "key: G" (every F becomes F#, like a kalimba with its F tongue raised; also D, F, Bb, Em …). Anything else, such as lyrics, links or headings, is skipped and listed.';
+  'Einen Kalimba-Tab einfügen oder selbst schreiben. Noten: Kalimba-Zahlen wie auf den Zungen (1 = C4 … 7 = B4) oder Buchstaben (C, F#, Bb, oder C5 mit Oktave; B ist hier das deutsche H). ' +
+  "Eine Oktave höher: ' ′ * ° oder ein Punkt darüber, doppelt (oder ″ \") für zwei; eine Oktave tiefer: , oder ein Punkt darunter. " +
+  'Zusammen gespielt: ( ) oder [ ], z. B. (1 3 5), (135), (5-7), [C E G]. Ein - nach einer Note hält sie einen Schlag länger: 2-4 ist 2 für zwei Schläge, dann 4. ' +
+  'Rhythmus: ein Schlag pro Note im Tempo des Reglers; _ halbiert, . verlängert um die Hälfte, 0 ist eine Pause. ' +
+  'Kopfzeilen: "title: …", "tempo: 90" (stellt den Regler), "meter: 3/4" (stellt den Takt, sonst 4/4) und "key: G" (jedes F wird F#, wie bei einer Kalimba mit erhöhter F-Zunge; auch D, F, Bb, Em …). Alles andere, etwa Liedtext, Links oder Überschriften, wird übersprungen und aufgelistet.';
 
 const MAX_NAME_LENGTH = 80;
+const METERS = ['2/4', '3/4', '4/4', '5/4', '6/8', '12/8'];
+const DEFAULT_METER = '4/4';
 
 // retuned kalimbas tabs are often written for; any other key can be typed as a "key:" line
 const TAB_TUNINGS: readonly [string, string][] = [
-  ['', 'as written (C)'],
-  ['G', 'F raised to F# (G major)'],
-  ['D', 'F and C raised (D major)'],
-  ['F', 'B lowered to Bb (F major)'],
+  ['', 'wie notiert (C)'],
+  ['G', 'F erhöht auf F# (G-Dur)'],
+  ['D', 'F und C erhöht (D-Dur)'],
+  ['F', 'B (H) erniedrigt auf Bb (F-Dur)'],
 ];
 
 function songOption(song: PracticeSong, index: number): string {
@@ -66,27 +71,30 @@ function controlsMarkup(songs: readonly PracticeSong[]): string {
   const modeOptions = MODES.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
   return `
     <div class="controls">
-      <label>Song <select name="song">${songOptions}</select></label>
-      <label>Mode <select name="mode">${modeOptions}</select></label>
+      <label>Lied <select name="song">${songOptions}</select></label>
+      <label>Modus <select name="mode">${modeOptions}</select></label>
       <label>Tempo <input type="range" name="tempo" min="20" max="240" step="1" value="${DEFAULT_TEMPO}" />
         <output name="tempo-value">${DEFAULT_TEMPO} BPM</output></label>
-      <label>Transpose <select name="transpose"></select></label>
+      <label>Takt <select name="meter">${METERS.map((m) => `<option value="${m}">${m}</option>`).join('')}</select></label>
+      <label class="click-toggle"><input type="checkbox" name="click" /> Klick</label>
+      <label>Transponieren <select name="transpose"></select></label>
       <button type="button" name="start">Start</button>
-      <button type="button" name="stop">Stop</button>
+      <button type="button" name="stop">Stopp</button>
     </div>
     <div class="song-text">
-      <textarea name="text" rows="4" spellcheck="false" aria-label="Song text"
-        placeholder="Paste a kalimba tab here, name it and press Import"></textarea>
+      <textarea name="text" rows="4" spellcheck="false" aria-label="Liedtext"
+        placeholder="Kalimba-Tab hier einfügen, benennen und Importieren drücken"></textarea>
+      <pre class="tab-view" hidden aria-label="Liedtext beim Spielen"></pre>
       <div class="import-row">
-        <label>Name <input type="text" name="import-name" maxlength="${MAX_NAME_LENGTH}" placeholder="e.g. Sweden" /></label>
-        <label>Tab tuning <select name="import-key">${TAB_TUNINGS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
-        <button type="button" name="import">Import</button>
-        <details class="help"><summary>Tab format</summary><p>${FORMAT_HELP}</p></details>
+        <label>Name <input type="text" name="import-name" maxlength="${MAX_NAME_LENGTH}" placeholder="z. B. Sweden" /></label>
+        <label>Tab-Stimmung <select name="import-key">${TAB_TUNINGS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
+        <button type="button" name="import">Importieren</button>
+        <details class="help"><summary>Tab-Format</summary><p>${FORMAT_HELP}</p></details>
       </div>
     </div>
     <div class="tuning-row">
-      <button type="button" name="retune" aria-pressed="false">Retune</button>
-      <button type="button" name="retune-reset">Reset tuning</button>
+      <button type="button" name="retune" aria-pressed="false">Umstimmen</button>
+      <button type="button" name="retune-reset">Stimmung zurücksetzen</button>
       <span class="tuning"></span>
     </div>
     <p class="status" role="status"></p>
@@ -98,29 +106,49 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 }
 
-function plural(count: number, word: string): string {
-  return `${count} ${word}${count === 1 ? '' : 's'}`;
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
 }
 
+const noteCount = (count: number) => plural(count, 'Note', 'Noten');
+
 function describeFit(name: string, a: Arrangement): string {
-  const shift = a.transpose === 0 ? 'as written' : `moved ${describeShift(a.transpose)}`;
   const folded = a.notes.filter((n) => n.fit === 'octave').length;
-  const parts = [name, shift];
-  if (folded > 0) parts.push(`${plural(folded, 'note')} moved by an octave to fit`);
-  if (a.skipped.length > 0) parts.push(`${plural(a.skipped.length, 'note')} left out: no tongue has them`);
+  const parts = [name, describeShift(a.transpose)];
+  if (folded > 0) parts.push(`${noteCount(folded)} um eine Oktave versetzt, damit sie passen`);
+  if (a.skipped.length > 0) parts.push(`${noteCount(a.skipped.length)} ausgelassen: keine Zunge dafür`);
   return parts.join(' · ');
 }
 
 function describeOption(option: TransposeOption, best: boolean): string {
   const parts = [describeShift(option.transpose)];
-  if (option.folded > 0) parts.push(`${plural(option.folded, 'note')} moved by an octave`);
-  if (option.skipped > 0) parts.push(`${plural(option.skipped, 'note')} left out`);
-  if (best) parts.push('best fit');
+  if (option.folded > 0) parts.push(`${noteCount(option.folded)} um eine Oktave versetzt`);
+  if (option.skipped > 0) parts.push(`${noteCount(option.skipped)} ausgelassen`);
+  if (best) parts.push('passt am besten');
   return parts.join(' · ');
 }
 
 // a tap in retune mode: natural → sharp → flat → natural
 const NEXT_TUNING: Record<number, number> = { 0: 1, 1: -1, [-1]: 0 };
+/** The song text as written, each played part in its own element so it can be highlighted. Keyed by start offset. */
+function renderTabView(view: HTMLElement, text: string, notes: readonly ArrangedNote[]): Map<number, HTMLElement> {
+  const ranges = [...new Map(notes.map((n) => [n.source.start, n.source])).values()].sort((a, b) => a.start - b.start);
+  const marks = new Map<number, HTMLElement>();
+  view.replaceChildren();
+  let cursor = 0;
+  for (const range of ranges) {
+    view.append(text.slice(cursor, range.start));
+    const mark = view.ownerDocument.createElement('span');
+    mark.className = 'tab-note';
+    mark.textContent = text.slice(range.start, range.end);
+    view.append(mark);
+    marks.set(range.start, mark);
+    cursor = range.end;
+  }
+  view.append(text.slice(cursor));
+  return marks;
+}
+
 const SKIPPED_SHOWN = 6;
 const SKIPPED_TEXT_LENGTH = 40;
 
@@ -129,16 +157,16 @@ function describeIgnored(ignored: readonly IgnoredText[]): string {
   const shorten = (text: string) => (text.length > SKIPPED_TEXT_LENGTH ? `${text.slice(0, SKIPPED_TEXT_LENGTH - 1)}…` : text);
   const items = ignored
     .slice(0, SKIPPED_SHOWN)
-    .map((i) => `line ${i.line} "${shorten(i.text)}"${i.reason ? ` (${i.reason})` : ''}`);
-  const more = ignored.length > SKIPPED_SHOWN ? ` and ${ignored.length - SKIPPED_SHOWN} more` : '';
-  return `Skipped what isn't notes: ${items.join(' · ')}${more}`;
+    .map((i) => `Zeile ${i.line} „${shorten(i.text)}“${i.reason ? ` (${i.reason})` : ''}`);
+  const more = ignored.length > SKIPPED_SHOWN ? ` und ${ignored.length - SKIPPED_SHOWN} weitere` : '';
+  return `Übersprungen, weil keine Noten: ${items.join(' · ')}${more}`;
 }
 
 function describeScore(session: PracticeSession): string {
-  if (session.mode === 'listen') return session.finished ? 'Done.' : '';
+  if (session.mode === 'listen') return session.finished ? 'Fertig.' : '';
   const { hits, misses, total } = session.score;
-  const prefix = session.finished ? 'Done: ' : '';
-  return `${prefix}${hits} of ${total} played · ${plural(misses, 'miss').replace('misss', 'misses')}`;
+  const prefix = session.finished ? 'Fertig: ' : '';
+  return `${prefix}${hits} von ${total} gespielt · ${misses} Fehler`;
 }
 
 /** The play-along view: song controls, a highway of falling notes over the kalimba, and the kalimba. */
@@ -162,6 +190,8 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const modeSelect = field<HTMLSelectElement>('mode');
   const tempoInput = field<HTMLInputElement>('tempo');
   const tempoValue = field<HTMLOutputElement>('tempo-value');
+  const meterSelect = field<HTMLSelectElement>('meter');
+  const clickBox = field<HTMLInputElement>('click');
   const textArea = field<HTMLTextAreaElement>('text');
   const status = panel.querySelector<HTMLElement>('.status')!;
   const error = panel.querySelector<HTMLElement>('.error')!;
@@ -172,6 +202,9 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const keySelect = field<HTMLSelectElement>('import-key');
   const transposeSelect = field<HTMLSelectElement>('transpose');
   const retuneButton = field<HTMLButtonElement>('retune');
+  const tabView = panel.querySelector<HTMLElement>('.tab-view')!;
+  let tabMarks = new Map<number, HTMLElement>();
+  let highlighted: HTMLElement[] = [];
   const tuningText = panel.querySelector<HTMLElement>('.tuning')!;
   let session: PracticeSession | undefined;
   let fit = '';
@@ -194,9 +227,28 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   );
   const highway = config.highway(canvas, kalimba);
 
+  // while a song runs the text is shown read-only, so the part being played can be highlighted
+  const showText = (editable: boolean) => {
+    // same height as the box it replaces, so the kalimba doesn't jump
+    if (!editable && !textArea.hidden && textArea.offsetHeight > 0) tabView.style.height = `${textArea.offsetHeight}px`;
+    textArea.hidden = !editable;
+    tabView.hidden = editable;
+  };
+
+  const highlight = (notes: readonly ArrangedNote[]) => {
+    highlighted.forEach((mark) => mark.classList.remove('now'));
+    highlighted = notes.map((n) => tabMarks.get(n.source.start)).filter((mark) => mark !== undefined);
+    highlighted.forEach((mark) => mark.classList.add('now'));
+    const first = highlighted[0];
+    if (first) tabView.scrollTop = Math.max(0, first.offsetTop - tabView.clientHeight / 2);
+  };
+
   const refresh = () => {
-    kalimba.setTargets(session && !session.finished ? session.targets() : []);
+    const running = session !== undefined && !session.finished;
+    kalimba.setTargets(running ? session!.targets() : []);
     if (session) status.textContent = [fit, describeScore(session)].filter(Boolean).join(' — ');
+    showText(!running);
+    if (running) highlight(session!.currentNotes());
   };
 
   const setTempo = (bpm: number) => {
@@ -220,16 +272,27 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     transposeSelect.disabled = options.length === 0;
   };
 
+  // a meter outside the list, such as 7/4, joins it
+  const setMeter = (meter: Meter | string) => {
+    const value = typeof meter === 'string' ? meter : `${meter.beatsPerBar}/${meter.beatUnit}`;
+    if (![...meterSelect.options].some((o) => o.value === value)) meterSelect.add(new Option(value, value));
+    meterSelect.value = value;
+  };
+  const beatsPerBar = () => Number(meterSelect.value.split('/')[0]);
+
   const showSong = () => {
     textArea.value = selectedSong()?.text ?? '';
     setTempo(tempoOf(textArea.value) ?? DEFAULT_TEMPO);
+    setMeter(meterOf(textArea.value) ?? DEFAULT_METER);
     offerTranspositions();
   };
 
-  // pasted tabs rarely name a tempo: then the slider keeps its setting
-  const takeTempoFromText = () => {
+  // pasted tabs rarely name a tempo or meter: then the controls keep their setting
+  const takeHeadersFromText = () => {
     const tempo = tempoOf(textArea.value);
     if (tempo !== undefined) setTempo(tempo);
+    const meter = meterOf(textArea.value);
+    if (meter) setMeter(meter);
   };
 
   const clearMessages = () => {
@@ -241,11 +304,11 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     clearMessages();
     const title = nameInput.value.trim();
     if (!title) {
-      error.textContent = 'Give the song a name to import it.';
+      error.textContent = 'Gib dem Lied einen Namen, um es zu importieren.';
       return;
     }
     if (songs.some((song) => song.title === title)) {
-      error.textContent = `A song named "${title}" is already in the list: pick another name.`;
+      error.textContent = `Ein Lied namens „${title}“ steht schon in der Liste: wähle einen anderen Namen.`;
       return;
     }
     // the tuning goes into the text as a key line, so it stays visible and editable
@@ -260,10 +323,10 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
       songSelect.value = String(songs.length - 1);
       nameInput.value = '';
       stop();
-      takeTempoFromText();
+      takeHeadersFromText();
       skipped.textContent = describeIgnored(parsed.ignored);
-      const ignoredPart = parsed.ignored.length > 0 ? `, ${plural(parsed.ignored.length, 'part')} skipped` : '';
-      status.textContent = `Added "${title}": ${plural(parsed.notes.length, 'note')}${ignoredPart}. Press Start to play it.`;
+      const ignoredPart = parsed.ignored.length > 0 ? `, ${plural(parsed.ignored.length, 'Teil', 'Teile')} übersprungen` : '';
+      status.textContent = `„${title}“ hinzugefügt: ${noteCount(parsed.notes.length)}${ignoredPart}. Start drücken zum Spielen.`;
     } catch (e) {
       if (!(e instanceof SongTextError)) throw e;
       error.textContent = e.message;
@@ -277,7 +340,8 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
       skipped.textContent = describeIgnored(song.ignored);
       const transpose = transposeSelect.value === '' ? undefined : Number(transposeSelect.value);
       const arrangement = arrange(song, tongues, { transpose });
-      session = new PracticeSession(arrangement, modeSelect.value as PracticeMode);
+      session = new PracticeSession(arrangement, modeSelect.value as PracticeMode, { beatsPerBar: beatsPerBar() });
+      tabMarks = renderTabView(tabView, textArea.value, arrangement.notes);
       // a title line in the text wins: it may be a built-in edited into something else
       fit = describeFit(titleOf(textArea.value) ?? selectedSong()?.title ?? song.title, arrangement);
       refresh();
@@ -291,13 +355,14 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const stop = () => {
     session = undefined;
     kalimba.setTargets([]);
+    showText(true);
   };
 
   const beatsPerMinute = () => Number(tempoInput.value);
 
   songSelect.addEventListener('change', showSong);
   textArea.addEventListener('input', () => {
-    takeTempoFromText();
+    takeHeadersFromText();
     offerTranspositions();
   });
   tempoInput.addEventListener('input', () => setTempo(beatsPerMinute()));
@@ -320,7 +385,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     kalimba.pluck(tongues[index]); // hear the new pitch, like checking a tongue with a tuner
   };
 
-  const tuningLine = () => (retuning ? `${describeTuning(tongues)} · tap a tongue: natural → # → b` : describeTuning(tongues));
+  const tuningLine = () => (retuning ? `${describeTuning(tongues)} · Zunge antippen: natürlich → # → b` : describeTuning(tongues));
 
   const toggleRetuning = () => {
     retuning = !retuning;
@@ -341,7 +406,9 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     tick(seconds) {
       if (session && !session.finished) {
         const beats = (seconds * beatsPerMinute()) / 60;
+        const from = session.beat;
         session.advance(beats).forEach((note) => kalimba.pluck(note.tongue));
+        if (clickBox.checked) clicksBetween(from, session.beat, session.beatsPerBar).forEach((c) => config.metronome?.click(c.accent));
         refresh();
       }
       highway.draw(session);

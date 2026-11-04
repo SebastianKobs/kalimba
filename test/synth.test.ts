@@ -1,4 +1,4 @@
-import { renderTine } from '../src/synth';
+import { BODY_FREQUENCY, renderClick, renderTine } from '../src/synth';
 
 const SAMPLE_RATE = 48000;
 
@@ -93,5 +93,51 @@ describe('renderTine', () => {
 
   it('sounds the same every time for the same note', () => {
     expect(renderTine(440, SAMPLE_RATE, 0.2)).toEqual(renderTine(440, SAMPLE_RATE, 0.2));
+  });
+
+  // amplitude of one frequency in a window: a single-bin DFT
+  const amplitudeAt = (samples: Float32Array, frequency: number, from: number, to: number) => {
+    const [start, end] = [at(from), at(to)];
+    let [re, im] = [0, 0];
+    for (let i = start; i < end; i++) {
+      const phase = (2 * Math.PI * frequency * i) / SAMPLE_RATE;
+      re += samples[i] * Math.cos(phase);
+      im -= samples[i] * Math.sin(phase);
+    }
+    return (2 * Math.hypot(re, im)) / (end - start);
+  };
+  const db = (ratio: number) => 20 * Math.log10(ratio);
+
+  it('keeps weak 2nd and 3rd harmonics ringing after the attack, so the octave is easy to hear', () => {
+    const f = 261.63;
+    const samples = renderTine(f, SAMPLE_RATE, 1);
+    const fundamental = amplitudeAt(samples, f, 0.2, 0.4);
+    const second = db(amplitudeAt(samples, 2 * f, 0.2, 0.4) / fundamental);
+    const third = db(amplitudeAt(samples, 3 * f, 0.2, 0.4) / fundamental);
+    expect(second).toBeGreaterThan(-28);
+    expect(second).toBeLessThan(-14);
+    expect(third).toBeGreaterThan(-40);
+    expect(third).toBeLessThan(second);
+  });
+
+  it('has a short wooden body resonance at the attack', () => {
+    // E6: no partial near the body frequency, so what sounds there is the body
+    const samples = renderTine(1318.51, SAMPLE_RATE, 1);
+    const early = amplitudeAt(samples, BODY_FREQUENCY, 0, 0.05);
+    const late = amplitudeAt(samples, BODY_FREQUENCY, 0.3, 0.4);
+    expect(early).toBeGreaterThan(0.02);
+    expect(late).toBeLessThan(early / 20);
+  });
+});
+
+describe('renderClick', () => {
+  it('is a short tick that starts from silence, the bar accent louder', () => {
+    const plain = renderClick(SAMPLE_RATE, false);
+    const accent = renderClick(SAMPLE_RATE, true);
+    expect(plain.length).toBeLessThanOrEqual(0.06 * SAMPLE_RATE);
+    expect([plain[0], accent[0]]).toEqual([0, 0]);
+    const peak = (s: Float32Array) => Math.max(...s.map(Math.abs));
+    expect(peak(accent)).toBeLessThanOrEqual(1);
+    expect(peak(accent)).toBeGreaterThan(1.5 * peak(plain));
   });
 });

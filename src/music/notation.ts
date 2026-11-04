@@ -1,11 +1,18 @@
 import type { Tongue } from '../layout';
 import { keySignature, NO_KEY_SIGNATURE, type KeySignature } from './key';
 
+/** Where a note was written: character offsets into the song text, end exclusive. */
+export interface SourceRange {
+  readonly start: number;
+  readonly end: number;
+}
+
 export interface SongNote {
   /** onset, in beats from the start */
   readonly beat: number;
   readonly beats: number;
   readonly midi: number;
+  readonly source: SourceRange;
 }
 
 export interface Song {
@@ -44,6 +51,7 @@ const TOKEN = /(?:\[[^\]]*\]|\([^)]*\)|[^\s|[(])+/g;
 interface Onset {
   midis: number[];
   beats: number;
+  source?: SourceRange;
 }
 
 /** Duration suffixes, jianpu style: each _ halves, a trailing . adds half. */
@@ -92,16 +100,16 @@ function chordPitches(content: string, context: PitchContext): number[] | undefi
   return midis.length > 0 ? midis : undefined;
 }
 
-/** Splits "1-(5-7)" at the - outside groups: ["1", "(5-7)"]; each - between parts is a hold. */
-function splitAtHolds(content: string): string[] {
-  const parts = [''];
+/** Splits "1-(5-7)" at the - outside groups: "1" at 0, "(5-7)" at 2; each - between parts is a hold. */
+function splitAtHolds(content: string): { text: string; start: number }[] {
+  const parts = [{ text: '', start: 0 }];
   let depth = 0;
-  for (const char of content) {
+  [...content].forEach((char, i) => {
     if (char === '(' || char === '[') depth++;
     if (char === ')' || char === ']') depth--;
-    if (char === '-' && depth === 0) parts.push('');
-    else parts[parts.length - 1] += char;
-  }
+    if (char === '-' && depth === 0) parts.push({ text: '', start: i + 1 });
+    else parts[parts.length - 1].text += char;
+  });
   return parts;
 }
 
@@ -121,20 +129,20 @@ function readOnset(part: string, context: PitchContext): Onset | undefined {
  * What one token says, in order: onsets and holds. A - after a note holds it a beat longer,
  * whether it stands alone ("2 -") or the next note follows without a space ("2-4").
  */
-function readToken(token: string, context: PitchContext): (Onset | typeof HOLD)[] | undefined {
+function readToken(token: string, tokenStart: number, context: PitchContext): (Onset | typeof HOLD)[] | undefined {
   const items: (Onset | typeof HOLD)[] = [];
-  const parts = splitAtHolds(token);
-  for (const [i, part] of parts.entries()) {
+  for (const [i, part] of splitAtHolds(token).entries()) {
     if (i > 0) items.push(HOLD);
-    if (part === '') continue;
-    const onset = readOnset(part, context);
+    if (part.text === '') continue;
+    const onset = readOnset(part.text.normalize('NFD'), context);
     if (!onset) return undefined;
-    items.push(onset);
+    const start = tokenStart + part.start;
+    items.push({ ...onset, source: { start, end: start + part.text.length } });
   }
   return items;
 }
 
-const AMBIGUOUS_DOT_REASON = "a • can't say whether the dot was above the note (octave up) or below (octave down): write ' or * for above, , for below";
+const AMBIGUOUS_DOT_REASON = "ein • sagt nicht, ob der Punkt über der Note (Oktave höher) oder darunter (Oktave tiefer) stand: ' oder * für darüber, , für darunter";
 
 /** Text the parser left out, so the player can see what was dropped. */
 export interface IgnoredText {
@@ -159,6 +167,28 @@ const TEMPO_HEADER = /^[ \t]*tempo[ \t]*:[ \t]*(.*?)[ \t]*$/im;
 export function tempoOf(text: string): number | undefined {
   const header = TEMPO_HEADER.exec(text);
   return header ? readTempo(header[1]) : undefined;
+}
+
+export interface Meter {
+  readonly beatsPerBar: number;
+  /** the note value of one beat: 4 for quarters, 8 for eighths */
+  readonly beatUnit: number;
+}
+
+const METER_HEADER = /^[ \t]*meter[ \t]*:[ \t]*(.*?)[ \t]*$/im;
+const BEAT_UNITS = [2, 4, 8, 16];
+
+function readMeter(value: string): Meter | undefined {
+  const match = /^(\d{1,2})\s*\/\s*(\d{1,2})$/.exec(value);
+  if (!match) return undefined;
+  const [beatsPerBar, beatUnit] = [Number(match[1]), Number(match[2])];
+  return beatsPerBar >= 1 && beatsPerBar <= 16 && BEAT_UNITS.includes(beatUnit) ? { beatsPerBar, beatUnit } : undefined;
+}
+
+/** The meter a song text names in a valid "meter:" header, if any: "meter: 3/4". */
+export function meterOf(text: string): Meter | undefined {
+  const header = METER_HEADER.exec(text);
+  return header ? readMeter(header[1]) : undefined;
 }
 
 const TITLE_HEADER = /^[ \t]*title[ \t]*:[ \t]*(.*?)[ \t]*$/im;
@@ -211,18 +241,25 @@ export function parseSong(text: string, options: ParseOptions = {}): Song {
     key: signature ?? NO_KEY_SIGNATURE,
     tongueTuning: signature ? new Map() : tuningByBasePitch(options.tongues ?? []),
   };
-  let title = 'Untitled';
+  let title = 'Ohne Titel';
   let beatsPerMinute = DEFAULT_TEMPO;
   const onsets: { beat: number; onset: Onset }[] = [];
   const ignored: IgnoredText[] = [];
   let beat = 0;
 
+  let lineStart = 0;
   text.split(/\r?\n/).forEach((rawLine, i) => {
     const lineNumber = i + 1;
+    const offset = lineStart;
+    lineStart += rawLine.length + (text[lineStart + rawLine.length] === '\r' ? 2 : 1);
     const line = rawLine.replace(/(^|\s)\/\/.*$/, ''); // not the // inside a URL
-    const header = /^\s*(title|tempo|key)\s*:\s*(.*?)\s*$/i.exec(line);
+    const header = /^\s*(title|tempo|key|meter)\s*:\s*(.*?)\s*$/i.exec(line);
+    if (header && header[1].toLowerCase() === 'meter') {
+      if (!readMeter(header[2])) ignored.push({ line: lineNumber, text: line.trim(), reason: 'Taktart wie 3/4 oder 6/8 schreiben' });
+      return;
+    }
     if (header && header[1].toLowerCase() === 'key') {
-      if (!keySignature(header[2])) ignored.push({ line: lineNumber, text: line.trim(), reason: 'unknown key: write e.g. G, F, Bb, Em' });
+      if (!keySignature(header[2])) ignored.push({ line: lineNumber, text: line.trim(), reason: 'unbekannte Tonart: z. B. G, F, Bb, Em' });
       return;
     }
     if (header) {
@@ -230,11 +267,12 @@ export function parseSong(text: string, options: ParseOptions = {}): Song {
       const tempo = isTitle ? undefined : readTempo(header[2]);
       if (isTitle) title = header[2];
       else if (tempo !== undefined) beatsPerMinute = tempo;
-      else ignored.push({ line: lineNumber, text: line.trim(), reason: `tempo must be ${TEMPO_RANGE.join('–')} beats per minute` });
+      else ignored.push({ line: lineNumber, text: line.trim(), reason: `Tempo muss zwischen ${TEMPO_RANGE[0]} und ${TEMPO_RANGE[1]} Schlägen pro Minute liegen` });
       return;
     }
-    const tokens = line.match(TOKEN) ?? [];
-    const readings = tokens.map((t) => readToken(t.normalize('NFD'), context));
+    const matches = [...line.matchAll(TOKEN)];
+    const tokens = matches.map((m) => m[0]);
+    const readings = matches.map((m) => readToken(m[0], offset + m.index, context));
     if (!isMostlyNotes(readings)) {
       ignored.push({ line: lineNumber, text: line.trim() });
       return;
@@ -259,10 +297,13 @@ export function parseSong(text: string, options: ParseOptions = {}): Song {
     });
   });
 
-  const notes = onsets.flatMap(({ beat, onset }) => onset.midis.map((midi) => ({ beat, beats: onset.beats, midi })));
+  const notes = onsets.flatMap(({ beat, onset }) =>
+    onset.midis.map((midi) => ({ beat, beats: onset.beats, midi, source: onset.source! })),
+  );
   if (notes.length === 0) {
-    const skipped = ignored.length > 0 ? ` (skipped ${ignored.length} part${ignored.length === 1 ? '' : 's'} it couldn't read)` : '';
-    throw new SongTextError(`No notes found${skipped}. Paste kalimba numbers (1–7) or letters (C–B).`);
+    const unreadable = ignored.length === 1 ? '1 nicht lesbaren Teil' : `${ignored.length} nicht lesbare Teile`;
+    const skipped = ignored.length > 0 ? ` (${unreadable} übersprungen)` : '';
+    throw new SongTextError(`Keine Noten gefunden${skipped}. Kalimba-Zahlen (1–7) oder Buchstaben (C–B) einfügen.`);
   }
   return { title, beatsPerMinute, notes, lengthBeats: beat, ignored };
 }

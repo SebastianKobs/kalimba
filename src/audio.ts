@@ -1,6 +1,6 @@
 import type { Plucker } from './kalimba-view';
 import type { Tongue } from './layout';
-import { renderTine } from './synth';
+import { renderClick, renderTine } from './synth';
 
 const VOICE_SECONDS = 4.5; // longest tine (F3) is 60 dB down after ~3 s
 const TAIL_FADE_SECONDS = 0.5;
@@ -19,6 +19,7 @@ export class WebAudioPlucker implements Plucker {
   // buffers by pitch, voices by place: a retuned tongue is a new object but the same tine
   private readonly buffers = new Map<number, AudioBuffer>();
   private readonly voices = new Map<number, Voice>();
+  private readonly clicks = new Map<boolean, AudioBuffer>();
 
   pluck(tongue: Tongue): void {
     const context = this.ensureContext();
@@ -37,6 +38,22 @@ export class WebAudioPlucker implements Plucker {
       if (this.voices.get(tongue.index) === voice) this.voices.delete(tongue.index);
       gain.disconnect();
     };
+  }
+
+  /** A metronome tick, the first beat of a bar accented; straight to the master, no voice. */
+  click(accent: boolean): void {
+    const context = this.ensureContext();
+    let buffer = this.clicks.get(accent);
+    if (!buffer) {
+      const samples = renderClick(context.sampleRate, accent);
+      buffer = context.createBuffer(1, samples.length, context.sampleRate);
+      buffer.copyToChannel(samples, 0);
+      this.clicks.set(accent, buffer);
+    }
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.master!);
+    source.start();
   }
 
   /** Render all tongues ahead of time so the first pluck of each has no latency. */

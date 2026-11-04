@@ -1,4 +1,4 @@
-import { parseSong, SongTextError, tempoOf, titleOf } from '../../src/music/notation';
+import { meterOf, parseSong, SongTextError, tempoOf, titleOf } from '../../src/music/notation';
 import { KALIMBA_21, retune } from '../../src/layout';
 
 const notes = (text: string) => parseSong(text).notes.map((n) => [n.beat, n.beats, n.midi]);
@@ -50,7 +50,7 @@ describe('parseSong', () => {
 
   it('still fails when nothing in the text is a note', () => {
     expect(() => parseSong('// nothing\n')).toThrow(SongTextError);
-    expect(() => parseSong('Hello world')).toThrow(/no notes/i);
+    expect(() => parseSong('Hello world')).toThrow(/keine Noten/i);
   });
 
   describe('pasted kalimba tabs', () => {
@@ -112,7 +112,7 @@ describe('parseSong', () => {
     it('skips a • after a note, since plain text cannot say if it was above or below', () => {
       const song = parseSong('1• 2 3');
       expect(song.notes.map((n) => n.midi)).toEqual([62, 64]);
-      expect(song.ignored).toEqual([{ line: 1, text: '1•', reason: expect.stringMatching(/above.*below/) }]);
+      expect(song.ignored).toEqual([{ line: 1, text: '1•', reason: expect.stringMatching(/über.*darunter/) }]);
     });
 
     it('skips whole lines that are mostly not notes, like the source line a copied page adds', () => {
@@ -126,6 +126,22 @@ describe('parseSong', () => {
     it('skips a lyrics line whole, even when a word looks like a note', () => {
       expect(notes('A ma-zing grace\nVerse 1\nC')).toEqual([[0, 1, 60]]);
     });
+  });
+});
+
+describe('source positions', () => {
+  const sources = (text: string) => parseSong(text).notes.map((n) => text.slice(n.source.start, n.source.end));
+
+  it('remembers where in the text each note was written', () => {
+    expect(sources('title: x\nC4  E4 |\n 5′_')).toEqual(['C4', 'E4', '5′_']);
+  });
+
+  it('points at the part of a - run being played, and at a whole group for its notes', () => {
+    expect(sources('1-(5-7)  (4-6)-2')).toEqual(['1', '(5-7)', '(5-7)', '(4-6)', '(4-6)', '2']);
+  });
+
+  it('counts line breaks of either kind', () => {
+    expect(sources('C\r\nD\nE')).toEqual(['C', 'D', 'E']);
   });
 });
 
@@ -174,7 +190,7 @@ describe('key signatures', () => {
   it('skips a key it does not know, and lists it', () => {
     const song = parseSong('key: H\nC');
     expect(song.notes.map((n) => n.midi)).toEqual([60]);
-    expect(song.ignored).toEqual([{ line: 1, text: 'key: H', reason: expect.stringMatching(/key/i) }]);
+    expect(song.ignored).toEqual([{ line: 1, text: 'key: H', reason: expect.stringMatching(/Tonart/) }]);
   });
 });
 
@@ -183,6 +199,21 @@ describe('tempoOf', () => {
     expect(tempoOf('title: x\ntempo: 72\nC')).toBe(72);
     expect(tempoOf('C D E')).toBeUndefined();
     expect(tempoOf('tempo: 5\nC')).toBeUndefined();
+  });
+});
+
+describe('meterOf', () => {
+  it('finds the meter line, if the text has a valid one', () => {
+    expect(meterOf('title: x\nmeter: 3/4\nC')).toEqual({ beatsPerBar: 3, beatUnit: 4 });
+    expect(meterOf('meter: 6/8\nC')).toEqual({ beatsPerBar: 6, beatUnit: 8 });
+    expect(meterOf('C D E')).toBeUndefined();
+    expect(meterOf('meter: 0/4\nC')).toBeUndefined();
+    expect(meterOf('meter: 4/5\nC')).toBeUndefined();
+  });
+
+  it('is a header for the parser, not notes; a bad one is skipped and listed', () => {
+    expect(parseSong('meter: 3/4\nC').notes).toHaveLength(1);
+    expect(parseSong('meter: 4/5\nC').ignored).toEqual([{ line: 1, text: 'meter: 4/5', reason: expect.stringMatching(/Taktart/) }]);
   });
 });
 

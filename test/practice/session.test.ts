@@ -13,6 +13,12 @@ describe('PracticeSession', () => {
     expect(session('C4', 'wait').beat).toBe(-2);
   });
 
+  it('counts in one bar by default', () => {
+    const s = new PracticeSession(arrange(parseSong('C4'), KALIMBA_21), 'wait', { beatsPerBar: 3 });
+    expect(s.beat).toBe(-3);
+    expect(s.beatsPerBar).toBe(3);
+  });
+
   describe('listen', () => {
     it('hands out each note once, when its beat is reached', () => {
       const s = session('C4 E4 [G4 C5]', 'listen');
@@ -78,6 +84,24 @@ describe('PracticeSession', () => {
       expect(notes(s.targets())).toEqual(['C4']);
       s.advance(1);
       expect(notes(s.targets())).toEqual(['E4']);
+    });
+  });
+
+  describe('current notes, for highlighting the song text', () => {
+    it('are the step to play next when the player plays', () => {
+      const s = session('C4 [E4 G4]', 'wait');
+      expect(notes(s.currentNotes().map((n) => n.tongue))).toEqual(['C4']);
+      s.pluck(tongue('C4'));
+      expect(notes(s.currentNotes().map((n) => n.tongue))).toEqual(['E4', 'G4']);
+    });
+
+    it('are the step sounding when the kalimba plays', () => {
+      const s = session('C4 E4', 'listen');
+      expect(s.currentNotes()).toEqual([]);
+      s.advance(2);
+      expect(notes(s.currentNotes().map((n) => n.tongue))).toEqual(['C4']);
+      s.advance(1);
+      expect(notes(s.currentNotes().map((n) => n.tongue))).toEqual(['E4']);
     });
   });
 });

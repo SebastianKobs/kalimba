@@ -21,20 +21,20 @@ describe('tongueNumberParts', () => {
 
 describe('describeTuning', () => {
   it('names the standard tuning', () => {
-    expect(describeTuning(KALIMBA_21)).toBe('Tuning: Standard C');
+    expect(describeTuning(KALIMBA_21)).toBe('Stimmung: Standard-C');
   });
 
   it('names a retuned tongue by its number, and the change', () => {
-    expect(describeTuning(tuned({ F5: 1 }))).toBe('Tuning: Standard C with 4′ raised from F to F#');
+    expect(describeTuning(tuned({ F5: 1 }))).toBe('Stimmung: Standard-C mit 4′ erhöht von F auf F#');
   });
 
   it('groups tongues retuned alike, low to high', () => {
-    expect(describeTuning(tuned({ F3: 1, F4: 1, F5: 1 }))).toBe('Tuning: Standard C with 4̣, 4 and 4′ raised from F to F#');
+    expect(describeTuning(tuned({ F3: 1, F4: 1, F5: 1 }))).toBe('Stimmung: Standard-C mit 4̣, 4 und 4′ erhöht von F auf F#');
   });
 
   it('lists different changes, lowest tongue first', () => {
     expect(describeTuning(tuned({ F4: 1, B3: -1, B4: -1 }))).toBe(
-      'Tuning: Standard C with 7̣ and 7 lowered from B to Bb; 4 raised from F to F#',
+      'Stimmung: Standard-C mit 7̣ und 7 erniedrigt von B auf Bb; 4 erhöht von F auf F#',
     );
   });
 });

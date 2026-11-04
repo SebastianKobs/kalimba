@@ -5,7 +5,9 @@ import type { ArrangedNote, Arrangement } from '../music/arrange';
 export type PracticeMode = 'listen' | 'play-along' | 'wait';
 
 export interface PracticeOptions {
-  /** beats shown before the first note, so it can be seen coming */
+  /** beats per bar of the song's meter */
+  readonly beatsPerBar: number;
+  /** beats shown before the first note, so it can be seen coming; one bar unless given */
   readonly leadInBeats: number;
   /** how far off the beat a pluck still counts, in beats */
   readonly hitWindowBeats: number;
@@ -20,13 +22,15 @@ export interface Score {
 
 export type PluckResult = 'hit' | 'miss' | 'ignored';
 
-const DEFAULTS: PracticeOptions = { leadInBeats: 4, hitWindowBeats: 0.3 };
+const DEFAULT_BEATS_PER_BAR = 4;
+const DEFAULT_HIT_WINDOW_BEATS = 0.3;
 
 /** Clock and scoring of one run through an arrangement. Time is in beats; the caller converts from seconds. */
 export class PracticeSession {
   private now: number;
   private readonly options: PracticeOptions;
   private readonly pending: ArrangedNote[]; // in onset order
+  private sounding: ArrangedNote[] = []; // listen mode: the step heard last
   private hits = 0;
   private misses = 0;
 
@@ -35,13 +39,22 @@ export class PracticeSession {
     readonly mode: PracticeMode,
     options: Partial<PracticeOptions> = {},
   ) {
-    this.options = { ...DEFAULTS, ...options };
+    const beatsPerBar = options.beatsPerBar ?? DEFAULT_BEATS_PER_BAR;
+    this.options = {
+      beatsPerBar,
+      leadInBeats: options.leadInBeats ?? beatsPerBar,
+      hitWindowBeats: options.hitWindowBeats ?? DEFAULT_HIT_WINDOW_BEATS,
+    };
     this.now = -this.options.leadInBeats;
     this.pending = [...arrangement.notes].sort((a, b) => a.beat - b.beat);
   }
 
   get beat(): number {
     return this.now;
+  }
+
+  get beatsPerBar(): number {
+    return this.options.beatsPerBar;
   }
 
   get score(): Score {
@@ -62,7 +75,12 @@ export class PracticeSession {
       return [];
     }
     this.now = target;
-    if (this.mode === 'listen') return this.takeWhile((n) => n.beat <= this.now);
+    if (this.mode === 'listen') {
+      const due = this.takeWhile((n) => n.beat <= this.now);
+      const lastBeat = due.at(-1)?.beat;
+      if (lastBeat !== undefined) this.sounding = due.filter((n) => n.beat === lastBeat);
+      return due;
+    }
     this.misses += this.takeWhile((n) => n.beat < this.now - this.options.hitWindowBeats).length;
     return [];
   }
@@ -84,6 +102,11 @@ export class PracticeSession {
   /** The tongues to play next. */
   targets(): Tongue[] {
     return this.currentStep().map((n) => n.tongue);
+  }
+
+  /** The notes to point at in the song text: the step sounding when listening, else the step to play next. */
+  currentNotes(): ArrangedNote[] {
+    return this.mode === 'listen' ? this.sounding : this.currentStep();
   }
 
   /** Notes not yet played or passed, for drawing. */

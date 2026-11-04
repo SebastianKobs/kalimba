@@ -12,6 +12,7 @@ function setup(tuning?: number[]) {
   document.body.append(root);
   const sounded: string[] = [];
   const savedTunings: number[][] = [];
+  const clicks: boolean[] = [];
   const sound = { pluck: (t: Tongue) => sounded.push(t.note) };
   const view = mountPractice(root, {
     tongues: KALIMBA_21,
@@ -20,6 +21,7 @@ function setup(tuning?: number[]) {
     highway: () => ({ draw() {} }),
     tuning,
     onTuningChange: (halfSteps) => savedTunings.push([...halfSteps]),
+    metronome: { click: (accent: boolean) => clicks.push(accent) },
   });
   const q = <T extends Element>(selector: string) => root.querySelector<T>(selector)!;
   const set = (name: string, value: string) => {
@@ -32,12 +34,27 @@ function setup(tuning?: number[]) {
   const targets = () => [...root.querySelectorAll<HTMLElement>('.tongue.target')].map((t) => t.dataset.note);
   const press = (note: string) => tongue(note).dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
   const start = () => q<HTMLButtonElement>('[name="start"]').click();
-  return { root, view, sounded, savedTunings, q, set, tongue, targets, press, start };
+  const check = (name: string, on: boolean) => {
+    const box = q<HTMLInputElement>(`[name="${name}"]`);
+    box.checked = on;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  return { root, view, sounded, savedTunings, clicks, q, set, check, tongue, targets, press, start };
 }
 
 afterEach(() => document.body.replaceChildren());
 
 describe('mountPractice', () => {
+  it('speaks German', () => {
+    const { q } = setup();
+    const texts = (selector: string) => [...q(`${selector}`).querySelectorAll('option')].map((o) => o.text);
+    expect(texts('[name="mode"]')).toEqual(['Warten: Schritt für Schritt', 'Mitspielen: im Takt', 'Anhören: die Kalimba spielt']);
+    expect(['start', 'stop', 'import', 'retune', 'retune-reset'].map((name) => q(`[name="${name}"]`).textContent)).toEqual([
+      'Start', 'Stopp', 'Importieren', 'Umstimmen', 'Stimmung zurücksetzen',
+    ]);
+    expect(q('.tuning').textContent).toBe('Stimmung: Standard-C');
+  });
+
   it('offers the built-in songs and shows the chosen one as text', () => {
     const { q, set } = setup();
     const options = [...q<HTMLSelectElement>('[name="song"]').options].map((o) => o.text);
@@ -73,7 +90,7 @@ describe('mountPractice', () => {
     set('text', 'title: Mine\nD4 F#4 C#5');
     start();
     view.tick(10);
-    expect(q('[role="status"]').textContent).toMatch(/Mine.*down a whole tone \(2 semitones\)/);
+    expect(q('[role="status"]').textContent).toMatch(/Mine · einen Ganzton tiefer \(2 Halbtöne\)/);
     expect(targets()).toEqual(['C4']);
   });
 
@@ -115,8 +132,8 @@ describe('mountPractice', () => {
     view.tick(10);
     expect(targets()).toEqual(['C4']);
     const skipped = q('.skipped').textContent;
-    expect(skipped).toMatch(/line 1 "Source: some page"/);
-    expect(skipped).toMatch(/line 2 "H4"/);
+    expect(skipped).toMatch(/Zeile 1 „Source: some page“/);
+    expect(skipped).toMatch(/Zeile 2 „H4“/);
   });
 
   it('does not start when nothing in the text is a note, and says so', () => {
@@ -125,7 +142,7 @@ describe('mountPractice', () => {
     set('text', 'just some words');
     start();
     view.tick(10);
-    expect(q('[role="alert"]').textContent).toMatch(/no notes/i);
+    expect(q('[role="alert"]').textContent).toMatch(/keine Noten/i);
     expect(targets()).toEqual([]);
   });
 
@@ -138,6 +155,114 @@ describe('mountPractice', () => {
     expect(targets()).toEqual([]);
   });
 
+  describe('meter and click', () => {
+    const meter = (q: ReturnType<typeof setup>['q']) => q<HTMLSelectElement>('[name="meter"]').value;
+
+    it('takes the meter from the song or pasted text that names one, 4/4 otherwise', () => {
+      const { q, set } = setup();
+      expect(meter(q)).toBe('4/4');
+      set('text', 'meter: 3/4\nC4');
+      expect(meter(q)).toBe('3/4');
+      set('text', 'C D'); // a tab without a meter keeps the choice
+      expect(meter(q)).toBe('3/4');
+      set('song', '1');
+      expect(meter(q)).toBe('4/4');
+      set('text', 'meter: 7/4\nC4');
+      expect(meter(q)).toBe('7/4');
+    });
+
+    it('counts in one bar of the chosen meter', () => {
+      const { set, start, view, sounded } = setup();
+      set('mode', 'listen');
+      set('text', 'C4');
+      set('meter', '3/4');
+      set('tempo', '60');
+      start();
+      view.tick(2.9);
+      expect(sounded).toEqual([]);
+      view.tick(0.2);
+      expect(sounded).toEqual(['C4']);
+    });
+
+    it('clicks every beat while Klick is on, the first of each bar accented', () => {
+      const { set, check, start, view, clicks } = setup();
+      set('mode', 'listen');
+      set('text', 'C4 C4 C4 C4');
+      set('meter', '3/4');
+      set('tempo', '60');
+      check('click', true);
+      start();
+      for (let i = 0; i < 4; i++) view.tick(i === 0 ? 0.01 : 1);
+      expect(clicks).toEqual([true, false, false, true]);
+    });
+
+    it('stays silent with Klick off', () => {
+      const { set, start, view, clicks } = setup();
+      set('mode', 'listen');
+      set('text', 'C4');
+      start();
+      view.tick(5);
+      expect(clicks).toEqual([]);
+    });
+  });
+
+  describe('highlighting the song text', () => {
+    const now = (q: ReturnType<typeof setup>['q']) => [...q('.tab-view').querySelectorAll('.now')].map((el) => el.textContent);
+    const editing = (q: ReturnType<typeof setup>['q']) => !q<HTMLTextAreaElement>('[name="text"]').hidden && q<HTMLElement>('.tab-view').hidden;
+
+    it('shows the text read-only while playing, with the note to play next highlighted', () => {
+      const { q, set, start, view, press } = setup();
+      set('mode', 'wait');
+      set('text', 'title: a<b\nC4 D4\nE4');
+      expect(editing(q)).toBe(true);
+      start();
+      view.tick(10);
+      expect(editing(q)).toBe(false);
+      expect(q('.tab-view').textContent).toBe('title: a<b\nC4 D4\nE4');
+      expect(now(q)).toEqual(['C4']);
+      press('C4');
+      expect(now(q)).toEqual(['D4']);
+    });
+
+    it('highlights the part of a - run being played, and a group once', () => {
+      const { q, set, start, view, press } = setup();
+      set('mode', 'wait');
+      set('text', '1-(5-7)');
+      start();
+      view.tick(10);
+      expect(now(q)).toEqual(['1']);
+      press('C4');
+      expect(now(q)).toEqual(['(5-7)']);
+    });
+
+    it('follows the kalimba when listening', () => {
+      const { q, set, start, view } = setup();
+      set('mode', 'listen');
+      set('text', 'C4 E4');
+      set('tempo', '60');
+      start();
+      view.tick(4);
+      expect(now(q)).toEqual(['C4']);
+      view.tick(1);
+      expect(now(q)).toEqual(['E4']);
+    });
+
+    it('gives the text back for editing when stopped or done', () => {
+      const { q, set, start, view, press } = setup();
+      set('mode', 'wait');
+      set('text', 'C4');
+      start();
+      view.tick(10);
+      q<HTMLButtonElement>('[name="stop"]').click();
+      expect(editing(q)).toBe(true);
+      start();
+      view.tick(10);
+      press('C4');
+      view.tick(0.1);
+      expect(editing(q)).toBe(true);
+    });
+  });
+
   describe('transpose', () => {
     const options = (q: ReturnType<typeof setup>['q']) =>
       [...q<HTMLSelectElement>('[name="transpose"]').options].map((o) => o.text);
@@ -146,9 +271,9 @@ describe('mountPractice', () => {
       const { q, set } = setup();
       set('text', 'key: G\n1 2 3 4 5 6 7 1′ 3″');
       expect(options(q)).toEqual([
-        'down a fifth (7 semitones) · best fit',
-        'up a fourth (5 semitones) · 1 note moved by an octave',
-        'up an octave and a fourth (17 semitones) · 2 notes moved by an octave',
+        'eine Quinte tiefer (7 Halbtöne) · passt am besten',
+        'eine Quarte höher (5 Halbtöne) · 1 Note um eine Oktave versetzt',
+        'eine Oktave und eine Quarte höher (17 Halbtöne) · 2 Noten um eine Oktave versetzt',
       ]);
       expect(q<HTMLSelectElement>('[name="transpose"]').value).toBe('-7');
     });
@@ -160,7 +285,7 @@ describe('mountPractice', () => {
       set('transpose', '5');
       start();
       view.tick(10);
-      expect(q('[role="status"]').textContent).toMatch(/moved up a fourth/);
+      expect(q('[role="status"]').textContent).toMatch(/eine Quarte höher/);
       expect(targets()).toEqual(['F4']);
     });
 
@@ -190,16 +315,16 @@ describe('mountPractice', () => {
     it('starts from a saved tuning and says which tongues are retuned', () => {
       const { root, q } = setup(raisedF);
       expect(notes(root).filter((n) => n?.includes('#'))).toEqual(['F#4', 'F#3', 'F#5']);
-      expect(q('.tuning').textContent).toBe('Tuning: Standard C with 4\u0323, 4 and 4′ raised from F to F#');
+      expect(q('.tuning').textContent).toBe('Stimmung: Standard-C mit 4\u0323, 4 und 4′ erhöht von F auf F#');
     });
 
     it('fits songs to the retuned tongues: a G major tab plays as written with the F tongues raised', () => {
       const { q, set, start, view } = setup(raisedF);
       set('text', 'key: G\n1 4 1″ 3″');
-      expect(q<HTMLSelectElement>('[name="transpose"]').options[0].text).toBe('as written · best fit');
+      expect(q<HTMLSelectElement>('[name="transpose"]').options[0].text).toBe('wie notiert · passt am besten');
       start();
       view.tick(1);
-      expect(q('[role="status"]').textContent).toMatch(/· as written/);
+      expect(q('[role="status"]').textContent).toMatch(/· wie notiert/);
     });
 
     it('plays a tab number on the tongue it names, as retuned', () => {
@@ -207,7 +332,7 @@ describe('mountPractice', () => {
       const { q, set, start, view, targets, press } = setup(onlyF5);
       set('mode', 'wait');
       set('text', '4′ 4');
-      expect(q<HTMLSelectElement>('[name="transpose"]').options[0].text).toBe('as written · best fit');
+      expect(q<HTMLSelectElement>('[name="transpose"]').options[0].text).toBe('wie notiert · passt am besten');
       start();
       view.tick(10);
       expect(targets()).toEqual(['F#5']);
@@ -220,7 +345,7 @@ describe('mountPractice', () => {
       q<HTMLButtonElement>('[name="retune-reset"]').click();
       expect(notes(root)).toEqual(KALIMBA_21.map((t) => t.note));
       expect(savedTunings.at(-1)).toEqual(KALIMBA_21.map(() => 0));
-      expect(q('.tuning').textContent).toBe('Tuning: Standard C');
+      expect(q('.tuning').textContent).toBe('Stimmung: Standard-C');
     });
 
     it('stops a running song when the tuning changes', () => {
@@ -255,8 +380,8 @@ describe('mountPractice', () => {
       expect(select.selectedOptions[0].text).toBe('My tab');
       expect(q<HTMLTextAreaElement>('[name="text"]').value).toBe('Source: a page\nC D E (CEG)');
       expect(q<HTMLInputElement>('[name="import-name"]').value).toBe('');
-      expect(q('[role="status"]').textContent).toMatch(/Added "My tab": 6 notes, 1 part skipped/);
-      expect(q('.skipped').textContent).toMatch(/line 1 "Source: a page"/);
+      expect(q('[role="status"]').textContent).toMatch(/„My tab“ hinzugefügt: 6 Noten, 1 Teil übersprungen/);
+      expect(q('.skipped').textContent).toMatch(/Zeile 1 „Source: a page“/);
     });
 
     it('keeps the imported text when switching songs and back', () => {
@@ -276,7 +401,7 @@ describe('mountPractice', () => {
       importButton(q).click();
       start();
       view.tick(1);
-      expect(q('[role="status"]').textContent).toMatch(/^My tab · as written/);
+      expect(q('[role="status"]').textContent).toMatch(/^My tab · wie notiert/);
     });
 
     it('writes the chosen tab tuning into the song as a key line', () => {
@@ -289,7 +414,7 @@ describe('mountPractice', () => {
       expect(q<HTMLSelectElement>('[name="import-key"]').value).toBe('');
       start();
       view.tick(1);
-      expect(q('[role="status"]').textContent).toMatch(/^Raised F tab · moved down a fifth/);
+      expect(q('[role="status"]').textContent).toMatch(/^Raised F tab · eine Quinte tiefer/);
     });
 
     it('leaves a key line already in the text alone', () => {
@@ -302,9 +427,9 @@ describe('mountPractice', () => {
     });
 
     it.each([
-      ['', 'C D E', /name/i],
-      ['Built-in one', 'C D E', /already/i],
-      ['Words', 'no notes here', /no notes/i],
+      ['', 'C D E', /Namen/],
+      ['Built-in one', 'C D E', /schon/],
+      ['Words', 'no notes here', /keine Noten/i],
     ])('refuses name %j with text %j, saying why, and adds nothing', (name, text, reason) => {
       const { q, set } = setup();
       set('text', text);
