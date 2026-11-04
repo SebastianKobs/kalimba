@@ -1,6 +1,6 @@
 import { keyForTongue, tongueForKey } from './keymap';
 import type { Tongue } from './layout';
-import { DOT_BELOW, tongueNumberParts } from './tuning';
+import { describeTuning, DOT_BELOW, engravedTuning, tongueNumberParts } from './tuning';
 
 export interface Plucker {
   pluck(tongue: Tongue): void;
@@ -16,17 +16,15 @@ export interface KalimbaHandle {
   readonly tongueElements: readonly HTMLElement[];
   /** relabel after retuning; same tongues in the same places */
   setTongues(tongues: readonly Tongue[]): void;
-  /** while on, a tap asks to retune the tongue (onRetune) instead of plucking it */
-  setRetuning(on: boolean): void;
   unmount(): void;
 }
 
 export interface KalimbaOptions {
+  /** a tap on a tongue's end, from the bridge up: retune it */
   onRetune?(tongue: Tongue): void;
+  /** the screw on the body: back to the standard tuning */
+  onResetTuning?(): void;
 }
-
-
-
 
 // what a German (QWERTZ) keyboard prints on the key at each position; the keys play by position
 const GERMAN_KEY_LABELS: Record<string, string> = { KeyZ: 'Y', Comma: ',', Period: '.', Slash: '-', Semicolon: 'Ö', Quote: 'Ä' };
@@ -45,6 +43,7 @@ function labelTongue(el: HTMLElement, tongue: Tongue): void {
   const dots = DOT_BELOW.repeat(below);
   const primes = above ? `<span class="octave">${above}</span>` : '';
   el.innerHTML = `
+    <span class="tongue-head" title="Umstimmen: ♮ → ♯ → ♭"></span>
     <span class="letter">${tongue.letter}${dots}${tongue.accidental}${primes}</span>
     <span class="cipher">${accidental}${digit}${dots}${primes}</span>
     <span class="key">${keyLabel(keyForTongue(tongue))}</span>`;
@@ -58,6 +57,17 @@ function renderTongue(tongue: Tongue): HTMLElement {
   el.style.setProperty('--length', String(tongue.lengthRatio));
   labelTongue(el, tongue);
   return el;
+}
+
+// a brass screw with a turning arrow engraved: back to the standard tuning
+function renderResetScrew(doc: Document): HTMLButtonElement {
+  const screw = doc.createElement('button');
+  screw.type = 'button';
+  screw.className = 'tuning-reset';
+  screw.setAttribute('aria-label', 'Stimmung zurücksetzen');
+  screw.title = 'Stimmung zurücksetzen';
+  screw.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 8.5A6 6 0 1 1 6 12" /><path d="M7.5 3.5v5h5" /></svg>`;
+  return screw;
 }
 
 function isTyping(target: EventTarget | null): boolean {
@@ -79,12 +89,26 @@ export function mountKalimba(
 ): KalimbaHandle {
   const doc = root.ownerDocument;
   let tongues = initialTongues;
-  let retuning = false;
   const board = doc.createElement('div');
   board.className = 'kalimba';
   const elements = tongues.map(renderTongue);
-  board.append(...elements);
+  const resetScrew = renderResetScrew(doc);
+  // the tuning burnt into the wood, across from its screw, short; in words for a screen reader
+  const said = doc.createElement('p');
+  said.className = 'tuning visually-hidden';
+  const engraving = doc.createElement('p');
+  engraving.className = 'engraving';
+  engraving.setAttribute('aria-hidden', 'true');
+  board.append(...elements, resetScrew, said, engraving);
   root.append(board);
+  const showTuning = () => {
+    resetScrew.disabled = tongues.every((t) => t.tuning === 0);
+    said.textContent = describeTuning(tongues);
+    engraving.title = said.textContent; // the whole of it, where the wood shows only part
+    engraving.replaceChildren(...engravedTuning(tongues).map((line) => Object.assign(doc.createElement('span'), { textContent: line })));
+  };
+  showTuning();
+  resetScrew.addEventListener('click', () => options.onResetTuning?.());
 
   const pluck = (tongue: Tongue) => {
     plucker.pluck(tongue);
@@ -102,7 +126,7 @@ export function mountKalimba(
     const tongue = tongueAt(e.target);
     if (!tongue) return;
     e.preventDefault();
-    if (retuning) {
+    if (e.target instanceof Element && e.target.closest('.tongue-head')) {
       options.onRetune?.(tongue); // no strumming while tuning: one tap, one tongue
       return;
     }
@@ -142,10 +166,7 @@ export function mountKalimba(
     setTongues(next) {
       tongues = next;
       next.forEach((tongue, i) => labelTongue(elements[i], tongue));
-    },
-    setRetuning(on) {
-      retuning = on;
-      board.classList.toggle('retuning', on);
+      showTuning();
     },
     unmount() {
       doc.removeEventListener('pointermove', onPointerMove);

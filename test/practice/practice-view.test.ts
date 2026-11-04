@@ -64,6 +64,12 @@ function setup(tuning?: number[], songPlayer?: SongClock) {
   return { root, view, sounded, savedTunings, clicks, q, set, check, tongue, targets, press, start };
 }
 
+// jsdom has no modal dialogs: open and close them as the browser does, as far as the view needs
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.open = true; };
+  HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) { this.open = false; };
+});
+
 afterEach(() => document.body.replaceChildren());
 
 describe('mountPractice', () => {
@@ -76,9 +82,10 @@ describe('mountPractice', () => {
     const { q } = setup();
     const texts = (selector: string) => [...q(`${selector}`).querySelectorAll('option')].map((o) => o.text);
     expect(texts('[name="mode"]')).toEqual(['Anhören: die Kalimba spielt', 'Mitspielen: im Takt', 'Warten: Schritt für Schritt']);
-    expect(['start', 'stop', 'import', 'retune', 'retune-reset'].map((name) => q(`[name="${name}"]`).textContent)).toEqual([
-      'Start', 'Stopp', 'Importieren', 'Umstimmen', 'Stimmung zurücksetzen',
+    expect(['start', 'stop', 'import', 'edit-text'].map((name) => q(`[name="${name}"]`).textContent)).toEqual([
+      'Start', 'Stopp', 'Importieren', 'Liedtext bearbeiten',
     ]);
+    expect(q('.tuning-reset').getAttribute('aria-label')).toBe('Stimmung zurücksetzen');
     expect(q('.tuning').textContent).toBe('Stimmung: Standard-C');
   });
 
@@ -169,7 +176,7 @@ describe('mountPractice', () => {
     set('text', 'just some words');
     start();
     view.tick(10);
-    expect(q('[role="alert"]').textContent).toMatch(/keine Noten/i);
+    expect(q('[role="alert"]:not(dialog *)').textContent).toMatch(/keine Noten/i); // on the page, by Start
     expect(targets()).toEqual([]);
   });
 
@@ -254,18 +261,37 @@ describe('mountPractice', () => {
     });
   });
 
-  describe('highlighting the song text', () => {
+  describe('the song text', () => {
     const now = (q: ReturnType<typeof setup>['q']) => [...q('.tab-view').querySelectorAll('.now')].map((el) => el.textContent);
-    const editing = (q: ReturnType<typeof setup>['q']) => !q<HTMLTextAreaElement>('[name="text"]').hidden && q<HTMLElement>('.tab-view').hidden;
+    const editorOpen = (q: ReturnType<typeof setup>['q']) => q<HTMLDialogElement>('dialog.song-editor').open;
 
-    it('shows the text read-only while playing, with the note to play next highlighted', () => {
+    it('is edited in an overlay of its own, with the import and the format’s help, opened from a button', () => {
+      const { q } = setup();
+      const editor = q('dialog.song-editor');
+      ['text', 'import-name', 'import-key', 'import', 'format-help', 'song-editor-close'].forEach((name) =>
+        expect(editor.querySelector(`[name="${name}"]`), name).not.toBeNull(),
+      );
+      expect(editorOpen(q)).toBe(false);
+      q<HTMLButtonElement>('[name="edit-text"]').click();
+      expect(editorOpen(q)).toBe(true);
+      q<HTMLButtonElement>('[name="song-editor-close"]').click();
+      expect(editorOpen(q)).toBe(false);
+    });
+
+    it('shows on a strip outside it, read-only, also when stopped: the song as written, as it is edited', () => {
+      const { q, set } = setup();
+      expect(q<HTMLElement>('.tab-view').hidden).toBe(false);
+      expect(q('.tab-view').textContent).toBe(SONGS[0]!.text);
+      set('text', 'C4 E4');
+      expect(q('.tab-view').textContent).toBe('C4 E4');
+    });
+
+    it('highlights on the strip the note to play next while playing', () => {
       const { q, set, start, view, press } = setup();
       set('mode', 'wait');
       set('text', 'title: a<b\nC4 D4\nE4');
-      expect(editing(q)).toBe(true);
       start();
       view.tick(10);
-      expect(editing(q)).toBe(false);
       expect(q('.tab-view').textContent).toBe('title: a<b\nC4 D4\nE4');
       expect(now(q)).toEqual(['C4']);
       press('C4');
@@ -295,19 +321,31 @@ describe('mountPractice', () => {
       expect(now(q)).toEqual(['E4']);
     });
 
-    it('gives the text back for editing when stopped or done', () => {
+    it('drops the highlight when stopped or done', () => {
       const { q, set, start, view, press } = setup();
       set('mode', 'wait');
       set('text', 'C4');
       start();
       view.tick(10);
       q<HTMLButtonElement>('[name="stop"]').click();
-      expect(editing(q)).toBe(true);
+      expect(now(q)).toEqual([]);
       start();
       view.tick(10);
       press('C4');
       view.tick(0.1);
-      expect(editing(q)).toBe(true);
+      expect(now(q)).toEqual([]);
+    });
+
+    it('stops a song playing when opened for editing: what plays is what the text says', () => {
+      const { q, set, start, view, targets } = setup();
+      set('mode', 'wait');
+      set('text', 'C4');
+      start();
+      view.tick(10);
+      expect(targets()).toEqual(['C4']);
+      q<HTMLButtonElement>('[name="edit-text"]').click();
+      expect(targets()).toEqual([]);
+      expect(now(q)).toEqual([]);
     });
   });
 
@@ -449,14 +487,15 @@ describe('mountPractice', () => {
     const raisedF = KALIMBA_21.map((t) => (F_TONGUES.includes(t.note) ? 1 : 0));
     const notes = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('.tongue')].map((t) => t.dataset.note);
 
-    it('cycles a tapped tongue natural → sharp → flat → natural, playing each new pitch', () => {
+    const tapEnd = (root: HTMLElement, index: number) =>
+      root.querySelectorAll<HTMLElement>('.tongue-head')[index]!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+
+    it('cycles a tongue tapped above the bridge natural → sharp → flat → natural, playing each new pitch; no mode to switch on', () => {
       const { q, root, sounded, savedTunings } = setup();
-      q<HTMLButtonElement>('[name="retune"]').click();
-      const f3 = () => root.querySelectorAll<HTMLElement>('.tongue')[10];
-      for (let i = 0; i < 3; i++) f3().dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      expect(q('[name="retune"]')).toBeNull();
+      for (let i = 0; i < 3; i++) tapEnd(root, 10);
       expect(sounded).toEqual(['F#3', 'Fb3', 'F3']);
       expect(savedTunings.map((t) => t[10])).toEqual([1, -1, 0]);
-      expect(q('[name="retune"]').getAttribute('aria-pressed')).toBe('true');
     });
 
     it('starts from a saved tuning and says which tongues are retuned', () => {
@@ -487,22 +526,21 @@ describe('mountPractice', () => {
       expect(targets()).toEqual(['F4']);
     });
 
-    it('resets to the standard tuning', () => {
+    it('resets to the standard tuning with the screw on the bridge', () => {
       const { q, root, savedTunings } = setup(raisedF);
-      q<HTMLButtonElement>('[name="retune-reset"]').click();
+      q<HTMLButtonElement>('.tuning-reset').click();
       expect(notes(root)).toEqual(KALIMBA_21.map((t) => t.note));
       expect(savedTunings.at(-1)).toEqual(KALIMBA_21.map(() => 0));
       expect(q('.tuning').textContent).toBe('Stimmung: Standard-C');
     });
 
     it('stops a running song when the tuning changes', () => {
-      const { q, set, start, view, targets, root } = setup();
+      const { set, start, view, targets, root } = setup();
       set('mode', 'wait');
       start();
       view.tick(10);
       expect(targets()).toEqual(['C4']);
-      q<HTMLButtonElement>('[name="retune"]').click();
-      root.querySelectorAll<HTMLElement>('.tongue')[0].dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      tapEnd(root, 0);
       expect(targets()).toEqual([]);
     });
   });
@@ -510,11 +548,17 @@ describe('mountPractice', () => {
   describe('import', () => {
     const importButton = (q: ReturnType<typeof setup>['q']) => q<HTMLButtonElement>('[name="import"]');
 
-    it('shows the song box, a name field and the Import button without opening anything', () => {
-      const { q } = setup();
-      for (const name of ['text', 'import-name', 'import']) {
-        expect(q(`[name="${name}"]`).closest('details, [hidden]')).toBeNull();
-      }
+    it('shuts the editor once the song is in the list, to be played; a reason not to stays in it, where it was asked', () => {
+      const { q, set } = setup();
+      q<HTMLButtonElement>('[name="edit-text"]').click();
+      set('text', 'C4 E4');
+      importButton(q).click(); // no name yet
+      expect(q<HTMLDialogElement>('dialog.song-editor').open).toBe(true);
+      expect(q('dialog.song-editor [role="alert"]').textContent).toMatch(/Namen/);
+      set('import-name', 'Mine');
+      importButton(q).click();
+      expect(q<HTMLDialogElement>('dialog.song-editor').open).toBe(false);
+      expect(q('dialog.song-editor [role="alert"]').textContent).toBe('');
     });
 
     it('adds the pasted song under its name to the song list, selects it and says what it read', () => {
@@ -582,7 +626,7 @@ describe('mountPractice', () => {
       set('text', text);
       set('import-name', name);
       importButton(q).click();
-      expect(q('[role="alert"]').textContent).toMatch(reason);
+      expect(q('dialog.song-editor [role="alert"]').textContent).toMatch(reason);
       expect(q<HTMLSelectElement>('[name="song"]').options).toHaveLength(2);
     });
   });

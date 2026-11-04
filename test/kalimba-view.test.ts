@@ -7,13 +7,15 @@ function setup() {
   document.body.append(root);
   const plucked: string[] = [];
   const retuned: string[] = [];
+  let resetCount = 0;
   const handle = mountKalimba(root, KALIMBA_21, { pluck: (t: Tongue) => plucked.push(t.note) }, {
     onRetune: (t: Tongue) => retuned.push(t.note),
+    onResetTuning: () => resetCount++,
   });
   const tongue = (note: string) => root.querySelector<HTMLElement>(`[data-note="${note}"]`)!;
   const press = (code: string, init: KeyboardEventInit = {}) =>
     document.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true, ...init }));
-  return { root, plucked, retuned, handle, tongue, press };
+  return { root, plucked, retuned, handle, tongue, press, resets: () => resetCount };
 }
 
 afterEach(() => document.body.replaceChildren());
@@ -105,14 +107,37 @@ describe('mountKalimba', () => {
     expect(f3.querySelector('.letter')?.textContent).toBe('F\u0323#'); // the dot goes under the letter, not the #
   });
 
-  it('in retune mode, a tap asks to retune the tongue instead of plucking it', () => {
-    const { handle, tongue, plucked, retuned } = setup();
-    handle.setRetuning(true);
-    tongue('F3').dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+  it('a tap on a tongue’s end, above the bridge, asks to retune it; a tap below plucks it', () => {
+    const { tongue, plucked, retuned } = setup();
+    tongue('F3').querySelector('.tongue-head')!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
     expect(retuned).toEqual(['F3']);
     expect(plucked).toEqual([]);
-    handle.setRetuning(false);
     tongue('F3').dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
     expect(plucked).toEqual(['F3']);
+  });
+
+  it('engraves its tuning into the body, and engraves it anew as it is retuned', () => {
+    const { handle, root } = setup();
+    const said = () => root.querySelector('.kalimba .tuning')!.textContent; // in words, for a screen reader
+    const engraved = () => [...root.querySelectorAll('.kalimba .engraving > span')].map((line) => line.textContent);
+    expect(said()).toBe('Stimmung: Standard-C');
+    expect(engraved()).toEqual(['Standard-C']);
+    expect(root.querySelector('.engraving')!.getAttribute('aria-hidden')).toBe('true');
+    handle.setTongues(retune(KALIMBA_21, KALIMBA_21.map((t) => (t.note === 'F3' ? 1 : 0))));
+    expect(said()).toBe('Stimmung: Standard-C mit 4\u0323 erhöht von F auf F#');
+    expect(engraved()).toEqual(['Standard-C', '4\u0323  F → F#']);
+  });
+
+  it('has a reset screw on the body, live only while a tongue is retuned', () => {
+    const { handle, root, resets } = setup();
+    const screw = root.querySelector<HTMLButtonElement>('.kalimba button.tuning-reset')!;
+    expect(screw.getAttribute('aria-label')).toBe('Stimmung zurücksetzen');
+    expect(screw.disabled).toBe(true);
+    handle.setTongues(retune(KALIMBA_21, KALIMBA_21.map((t) => (t.note === 'F3' ? 1 : 0))));
+    expect(screw.disabled).toBe(false);
+    screw.click();
+    expect(resets()).toBe(1);
+    handle.setTongues(KALIMBA_21);
+    expect(screw.disabled).toBe(true);
   });
 });

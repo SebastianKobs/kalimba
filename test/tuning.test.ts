@@ -1,5 +1,5 @@
 import { KALIMBA_21, retune } from '../src/layout';
-import { describeTuning, tongueNumber, tongueNumberParts } from '../src/tuning';
+import { describeTuning, engravedTuning, tongueNumber, tongueNumberParts } from '../src/tuning';
 
 const tuned = (changes: Record<string, number>) => retune(KALIMBA_21, KALIMBA_21.map((t) => changes[t.note] ?? 0));
 const byNote = (note: string) => KALIMBA_21.find((t) => t.note === note)!;
@@ -36,5 +36,21 @@ describe('describeTuning', () => {
     expect(describeTuning(tuned({ F4: 1, B3: -1, B4: -1 }))).toBe(
       'Stimmung: Standard-C mit 7̣ und 7 erniedrigt von B auf Bb; 4 erhöht von F auf F#',
     );
+  });
+});
+
+describe('engravedTuning', () => {
+  it('is short enough to burn into the wood: the tuning, then a line per change, its tongues and the step', () => {
+    expect(engravedTuning(KALIMBA_21)).toEqual(['Standard-C']);
+    expect(engravedTuning(tuned({ F3: 1, F4: 1, F5: 1 }))).toEqual(['Standard-C', '4̣ 4 4′  F → F#']);
+    expect(engravedTuning(tuned({ F4: 1, B3: -1, B4: -1 }))).toEqual(['Standard-C', '7̣ 7  B → Bb', '4  F → F#']);
+  });
+
+  it('stays within a few lines however many tongues are retuned: past three changes, two and how many more', () => {
+    const all = retune(KALIMBA_21, KALIMBA_21.map((_, i) => (i % 2 === 0 ? 1 : -1)));
+    const lines = engravedTuning(all);
+    expect(lines).toHaveLength(4);
+    expect(lines[3]).toMatch(/^\+ \d+ weitere$/);
+    expect(engravedTuning(tuned({ F4: 1, B3: -1, C4: 1 }))).toHaveLength(4); // three changes still fit whole
   });
 });

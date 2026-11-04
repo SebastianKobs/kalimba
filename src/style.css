@@ -32,6 +32,9 @@
   --wood-inside-bottom: #6a341a;
   --wood-label: #f3d6c2;
   --wood-value: #fff3ea;
+  --maple-light: #ecd3ae;  /* the plate the tuning is burnt into */
+  --maple: #dcb98c;
+  --burnt: #3a1606;
   --brass-light: #d9b26a;
   --brass: #b88a45;
   --brass-dark: #7c5a28;
@@ -55,13 +58,14 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px 16px 48px;
+  padding: 12px 16px 48px;
 }
 
-header { text-align: center; max-width: 70ch; margin-bottom: 10px; }
-h1 { font-size: 1.6rem; margin: 0 0 6px; letter-spacing: 0.01em; }
+/* the title and how to play on one line, wrapping on a phone */
+header { width: min(100%, 1200px); display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 16px; margin-bottom: 10px; }
+h1 { font-size: 1.3rem; margin: 0; letter-spacing: 0.01em; }
 h1 .key { color: var(--muted); font-weight: 400; }
-header p { color: var(--muted); font-size: 0.9rem; margin: 0; }
+header p { color: var(--muted); font-size: 0.85rem; margin: 0; }
 kbd {
   border: 1px solid var(--muted);
   border-radius: 3px;
@@ -69,18 +73,18 @@ kbd {
   font-size: 0.85em;
 }
 
-#app { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+#app { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 
-.practice { width: min(100%, 1100px); display: flex; flex-direction: column; gap: 14px; }
+.practice { width: min(100%, 1200px); display: flex; flex-direction: column; gap: 10px; }
 
 /* a panel: a group of controls on its own ground */
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; }
 
 /* a field: its name small above it, every field the same height */
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 0.75rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
 /* a select is as wide as its longest option: held to its field, so a long transposition never widens the row or the page */
 .field select { width: 100%; min-width: 0; text-overflow: ellipsis; }
-.field select, .field input[type="text"], .song-text textarea {
+.field select, .field input[type="text"], .song-editor textarea {
   font: inherit;
   font-size: 0.95rem;
   letter-spacing: 0;
@@ -91,7 +95,7 @@ kbd {
   border-radius: 8px;
 }
 .field select, .field input[type="text"] { height: 40px; padding: 0 12px; }
-.field select:focus-visible, .field input:focus-visible, .song-text textarea:focus-visible, button:focus-visible, .click-toggle:focus-within {
+.field select:focus-visible, .field input:focus-visible, .song-editor textarea:focus-visible, button:focus-visible, .click-toggle:focus-within {
   outline: 2px solid var(--accent-soft);
   outline-offset: 2px;
 }
@@ -112,36 +116,35 @@ button { font: inherit; cursor: pointer; }
 .controls button[name="start"] { height: 44px; padding: 0 30px; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; box-shadow: 0 4px 14px var(--glow); }
 .controls button[name="stop"] { height: 44px; }
 
-/* playing: song, mode and transposing; then tempo, meter, click and the buttons */
-.controls { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-end; }
-.controls .break { flex-basis: 100%; height: 0; }
-.controls .song { flex: 2 1 260px; }
-.controls .mode { flex: 1 1 200px; }
-.controls .transpose { flex: 1 1 220px; }
-.controls .tempo { flex: 2 1 280px; }
-.controls .tempo span { display: flex; align-items: center; gap: 12px; height: 40px; }
-.controls .tempo input { flex: 1; }
-.controls .meter { flex: 0 1 110px; }
+/* playing: one row on a laptop, song to Start; it wraps on narrower screens */
+.controls { display: flex; flex-wrap: wrap; gap: 12px 12px; align-items: flex-end; }
+.controls .song { flex: 1.6 1 200px; }
+.controls .mode { flex: 1 1 140px; }
+.controls .transpose { flex: 1 1 140px; }
+.controls .tempo { flex: 1 1 190px; }
+.controls .tempo span { display: flex; align-items: center; gap: 10px; height: 40px; }
+.controls .tempo input { flex: 1; min-width: 0; width: 100%; } /* a range has a wide default: held to its field */
+.controls .meter { flex: 0 0 80px; }
 .controls output { color: var(--text); font-size: 0.95rem; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; min-width: 4.5em; }
 .controls .click-toggle { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); color: var(--text); font-size: 0.95rem; cursor: pointer; }
 .controls .click-toggle input { width: 18px; height: 18px; margin: 0; }
 .controls .actions { display: flex; gap: 10px; margin-left: auto; }
 
-/* the song text: the tab as written, or while it plays the same text with the played part marked */
-.song-text { display: flex; flex-direction: column; gap: 12px; }
-.song-text h2 { margin: 0; font-size: 0.75rem; font-weight: 600; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
-.song-text textarea, .tab-view { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.875rem; line-height: 1.6; }
-.song-text textarea { width: 100%; padding: 10px 14px; resize: vertical; }
+/* the song text on a strip of two lines: as written, or while it plays with the played part marked, its line on top */
+.song-editor textarea, .tab-view { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.875rem; line-height: 1.6; }
 .tab-view {
+  --lines: 2;
   margin: 0;
   position: relative; /* offsetTop of the highlighted note is measured from here */
-  overflow-y: auto;
+  box-sizing: content-box;
+  height: calc(var(--lines) * 1.6em);
+  overflow: hidden; /* scrolled by the view, to the part being played */
   white-space: pre-wrap;
-  color: var(--text);
-  background: var(--field);
+  color: var(--muted);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 6px 14px 0; /* none below: the next line starts at the border, out of sight */
 }
 .tab-note.now { background: var(--accent); color: var(--accent-ink); border-radius: 4px; box-shadow: 0 0 0 2px var(--accent); }
 .import-row { display: flex; flex-wrap: wrap; gap: 12px 14px; align-items: flex-end; }
@@ -149,9 +152,9 @@ button { font: inherit; cursor: pointer; }
 .import-row button { height: 40px; padding: 0 20px; color: var(--text); background: transparent; border: 1px solid var(--accent-soft); border-radius: 8px; font-weight: 600; }
 .import-row .help-link { margin-left: auto; padding: 0 4px; border: none; color: var(--accent-soft); font-weight: 400; text-decoration: underline; text-underline-offset: 3px; }
 
-/* the tab format's help: an overlay of short sections, an example as written beside what it means */
-.format-help {
-  width: min(760px, calc(100vw - 32px));
+/* overlays: the song text's editor and the format's help, a card over the dimmed page */
+.overlay {
+  width: min(800px, calc(100vw - 32px));
   max-width: none;
   max-height: calc(100dvh - 32px);
   padding: 0;
@@ -162,10 +165,17 @@ button { font: inherit; cursor: pointer; }
   border-radius: 12px;
   box-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
 }
-.format-help::backdrop { background: rgb(6 12 8 / 0.7); backdrop-filter: blur(2px); }
-.format-help header { max-width: none; margin: 0; position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.format-help h2 { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text); letter-spacing: 0; text-transform: none; } /* not the panel's small caps: it sits in the song panel */
-.format-help header button { width: 36px; height: 36px; padding: 0; font-size: 1.4rem; line-height: 1; }
+.overlay::backdrop { background: rgb(6 12 8 / 0.7); backdrop-filter: blur(2px); }
+/* not the page's header: a bar with the title and its × */
+.overlay header { width: auto; max-width: none; margin: 0; position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.overlay h2 { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text); }
+.overlay header button { width: 36px; height: 36px; padding: 0; font-size: 1.4rem; line-height: 1; color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 8px; }
+
+.song-editor-body { display: flex; flex-direction: column; gap: 14px; padding: 16px 20px 20px; }
+.song-editor textarea { width: 100%; padding: 10px 14px; resize: vertical; }
+.editor-error:empty { display: none; }
+
+/* the tab format's help: short sections, an example as written beside what it means */
 .format-help > p { margin: 14px 20px; color: var(--muted); font-size: 0.9rem; }
 .format-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 18px 28px; padding: 0 20px; }
 .format-help h3 { margin: 0 0 8px; font-size: 0.75rem; font-weight: 600; color: var(--accent-soft); letter-spacing: 0.06em; text-transform: uppercase; }
@@ -175,12 +185,10 @@ button { font: inherit; cursor: pointer; }
 
 /* what's going on, and the tuning, on one line under the panels */
 .status-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 0 4px; }
-.status { min-height: 1.3em; margin: 0; font-size: 0.9rem; }
+.status { flex: 1 1 320px; min-height: 1.3em; margin: 0; font-size: 0.9rem; }
 .tuning-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 0.9rem; color: var(--muted); }
 .tuning-row button { height: 36px; padding: 0 14px; font-weight: 400; }
-.tuning-row button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-.tuning { color: var(--text); }
-.kalimba.retuning .tongue { cursor: cell; }
+.tuning-row button[name="edit-text"] { border-color: var(--accent-soft); margin-right: 6px; }
 .tongue.retuned .letter, .tongue.retuned .cipher { color: var(--retuned); }
 /* octave marks are easy to overlook: bigger, heavier, own colour */
 .tongue .octave { font-size: 1.6em; font-weight: 900; line-height: 0.6; margin-left: 1px; color: var(--octave); }
@@ -205,7 +213,9 @@ button { font: inherit; cursor: pointer; }
   display: flex;
   align-items: flex-start;
   gap: var(--gap);
-  padding: 28px clamp(10px, 3vw, 36px) 40px;
+  --side: clamp(10px, 3vw, 36px);
+  --head: 30px; /* a tongue's end, from its tip to the bridge's far edge: a tap there retunes it */
+  padding: 8px var(--side) 40px;
   border-radius: 18px 18px 48% 48% / 18px 18px 22% 22%;
   background:
     radial-gradient(ellipse 70% 45% at 50% 26%, var(--wood-sheen), transparent 70%),
@@ -221,13 +231,14 @@ button { font: inherit; cursor: pointer; }
   max-width: 100%;
 }
 
-/* brass bridge bar the tongues hang from */
+/* brass bridge bar across the tongues, their ends showing above it; taps go through to the tongue under it */
 .kalimba::before {
   content: '';
   position: absolute;
   left: 6%;
   right: 6%;
-  top: 18px;
+  top: calc(8px + var(--head) - 14px);
+  pointer-events: none;
   height: 14px;
   border-radius: 4px;
   background: linear-gradient(180deg, var(--brass-light), var(--brass) 45%, var(--brass-dark));
@@ -253,7 +264,66 @@ button { font: inherit; cursor: pointer; }
   transform-origin: 50% 0;
 }
 
+.tongue { position: relative; }
 .tongue:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+/* its end, above and under the bridge: tapped, it cycles the tuning; lit as the pointer comes near */
+.tongue-head { position: absolute; inset: 0 0 auto; height: var(--head); border-radius: 2px 2px 0 0; cursor: cell; }
+.tongue-head:hover { background: linear-gradient(180deg, color-mix(in srgb, var(--accent-soft) 55%, transparent), transparent); }
+
+/* the reset: a brass screw in the wood under the short tongues, a turning arrow engraved; live only once retuned */
+.tuning-reset {
+  position: absolute;
+  left: calc(var(--side) + 2px);
+  top: calc(8px + var(--max-tongue) * 0.44 + 26px);
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  border: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--brass-light), var(--brass) 55%, var(--brass-dark));
+  box-shadow: inset 0 1px 0 #fff6, inset 0 -2px 3px #0005, 0 2px 4px #0008;
+  color: var(--brass-dark);
+  cursor: pointer;
+  transition: box-shadow 0.3s, filter 0.3s;
+}
+.tuning-reset svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.tuning-reset:not(:disabled) { box-shadow: inset 0 1px 0 #fff6, inset 0 -2px 3px #0005, 0 2px 4px #0008, 0 0 12px var(--brass-light); }
+.tuning-reset:not(:disabled):hover { filter: brightness(1.12); }
+.tuning-reset:not(:disabled):active svg { transform: rotate(-60deg); transition: transform 0.2s; }
+.tuning-reset:disabled { cursor: default; filter: saturate(0.4) brightness(0.75); }
+.tuning-reset:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+
+/* the tuning burnt into a maple plate inlaid in the body, across from its screw: dark on pale wood reads (about 9:1), dark on the cherry would not */
+.kalimba .engraving {
+  position: absolute;
+  right: var(--side);
+  top: calc(8px + var(--max-tongue) * 0.44 + 40px);
+  width: max-content; /* the plate as wide as its longest line */
+  margin: 0;
+  text-align: center;
+  font: italic 600 clamp(9px, 1.35vw, 14px) / 1.35 Georgia, 'Times New Roman', serif;
+  letter-spacing: 0.02em;
+  box-sizing: border-box;
+  padding: 0.5em 0.4em;
+  border-radius: 6px;
+  /* the body's grain, finer, half veiled by the maple: a paler wood with its own fibres */
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--maple-light) 55%, transparent), color-mix(in srgb, var(--maple) 45%, transparent)),
+    url('./wood-grain.svg') 30% 40% / 320% 260% no-repeat,
+    repeating-linear-gradient(178.6deg, transparent 0 6px, #8a5a2a1f 6px 7px, transparent 7px 15px),
+    linear-gradient(180deg, var(--maple-light), var(--maple));
+  box-shadow: inset 0 1px 2px #5a2a0a66, inset 0 -1px 0 #fff4, 0 1px 0 #ffd8b833;
+  color: var(--burnt);
+  text-shadow: 0 0 1px #6a2a0a80; /* a scorched edge */
+  cursor: help;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: pre; /* the two spaces before a change stay */
+}
+.engraving span:first-child { font-size: 1.25em; letter-spacing: 0.04em; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .tongue .key { margin-top: 6px; font-size: 0.75em; opacity: 0.55; font-weight: 400; }
 
 .tongue.target { box-shadow: 0 0 0 3px var(--accent), 0 0 18px var(--accent); }

@@ -28,18 +28,35 @@ function listed(items: string[]): string {
   return items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} und ${items.at(-1)}`;
 }
 
-/** "Stimmung: Standard-C mit 4̣, 4 und 4′ erhöht von F auf F#": retuned tongues grouped by change, lowest first. */
-export function describeTuning(tongues: readonly Tongue[]): string {
+/** The retuned tongues grouped by change (same letter, same step), lowest tongue first. */
+function tuningChanges(tongues: readonly Tongue[]): Tongue[][] {
   const retuned = tongues.filter((t) => t.tuning !== 0).sort((a, b) => a.midi - a.tuning - (b.midi - b.tuning));
-  if (retuned.length === 0) return 'Stimmung: Standard-C';
   const groups = new Map<string, Tongue[]>();
   for (const tongue of retuned) {
     const change = `${tongue.letter}${tongue.tuning}`;
     groups.set(change, [...(groups.get(change) ?? []), tongue]);
   }
-  const changes = [...groups.values()].map((group) => {
+  return [...groups.values()];
+}
+
+/** "Stimmung: Standard-C mit 4̣, 4 und 4′ erhöht von F auf F#": retuned tongues grouped by change, lowest first. */
+export function describeTuning(tongues: readonly Tongue[]): string {
+  const changes = tuningChanges(tongues).map((group) => {
     const { letter, accidental, tuning } = group[0];
     return `${listed(group.map(tongueNumber))} ${tuning > 0 ? 'erhöht' : 'erniedrigt'} von ${letter} auf ${letter}${accidental}`;
   });
-  return `Stimmung: Standard-C mit ${changes.join('; ')}`;
+  return changes.length === 0 ? 'Stimmung: Standard-C' : `Stimmung: Standard-C mit ${changes.join('; ')}`;
+}
+
+const ENGRAVED_CHANGES = 3;
+
+/** The tuning short enough to burn into the wood: "Standard-C", then a line per change, "4̣ 4 4′  F → F#"; past three, two and "+ n weitere". */
+export function engravedTuning(tongues: readonly Tongue[]): string[] {
+  const changes = tuningChanges(tongues).map((group) => {
+    const { letter, accidental } = group[0];
+    return `${group.map(tongueNumber).join(' ')}  ${letter} → ${letter}${accidental}`;
+  });
+  if (changes.length <= ENGRAVED_CHANGES) return ['Standard-C', ...changes];
+  const shown = ENGRAVED_CHANGES - 1;
+  return ['Standard-C', ...changes.slice(0, shown), `+ ${changes.length - shown} weitere`];
 }

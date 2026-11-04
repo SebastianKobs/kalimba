@@ -1,9 +1,8 @@
 import { mountKalimba, type KalimbaHandle, type Plucker } from '../kalimba-view';
 import { retune, type Tongue } from '../layout';
-import { describeTuning } from '../tuning';
 import { arrange, transposeOptions, type ArrangedNote, type Arrangement, type TransposeOption } from '../music/arrange';
 import { describeShift } from '../music/interval';
-import { DEFAULT_TEMPO, keyOf, meterOf, parseSong, SongTextError, tempoOf, titleOf, type IgnoredText, type Meter } from '../music/notation';
+import { DEFAULT_TEMPO, keyOf, meterOf, parseSong, SongTextError, tempoOf, titleOf, type IgnoredText, type Meter, type SourceRange } from '../music/notation';
 import { clicksBetween } from './metronome';
 import { PracticeSession, type PracticeMode } from './session';
 import type { SongStart } from './song-player';
@@ -86,12 +85,33 @@ const FORMAT_HELP: readonly { title: string; lines: readonly [string, string][] 
   ] },
 ];
 
+// the song text edited, and imported, in an overlay: the page keeps its room for the kalimba
+function songEditorMarkup(): string {
+  return `<dialog class="song-editor overlay" aria-labelledby="song-editor-title">
+      <header>
+        <h2 id="song-editor-title">Liedtext</h2>
+        <button type="button" name="song-editor-close" aria-label="Schließen">×</button>
+      </header>
+      <div class="song-editor-body">
+        <textarea name="text" rows="12" spellcheck="false" aria-label="Liedtext"
+          placeholder="Kalimba-Tab hier einfügen, benennen und Importieren drücken"></textarea>
+        <div class="import-row">
+          <label class="field">Name <input type="text" name="import-name" maxlength="${MAX_NAME_LENGTH}" placeholder="z. B. Sweden" /></label>
+          <label class="field">Tab-Stimmung <select name="import-key">${TAB_TUNINGS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
+          <button type="button" name="import">Importieren</button>
+          <button type="button" name="format-help" class="help-link" aria-haspopup="dialog">Tab-Format ?</button>
+        </div>
+        <p class="error editor-error" role="alert"></p>
+      </div>
+    </dialog>`;
+}
+
 function formatHelpMarkup(): string {
   const sections = FORMAT_HELP.map(({ title, lines }) => {
     const rows = lines.map(([example, meaning]) => `<dt><code>${escapeHtml(example)}</code></dt><dd>${escapeHtml(meaning)}</dd>`).join('');
     return `<section><h3>${title}</h3><dl>${rows}</dl></section>`;
   }).join('');
-  return `<dialog class="format-help" aria-labelledby="format-help-title">
+  return `<dialog class="format-help overlay" aria-labelledby="format-help-title">
       <header>
         <h2 id="format-help-title">Tab-Format</h2>
         <button type="button" name="format-help-close" aria-label="Schließen">×</button>
@@ -126,7 +146,6 @@ function controlsMarkup(songs: readonly PracticeSong[]): string {
       <label class="field song">Lied <select name="song">${songOptions}</select></label>
       <label class="field mode">Modus <select name="mode">${modeOptions}</select></label>
       <label class="field transpose">Transponieren <select name="transpose"></select></label>
-      <div class="break"></div>
       <label class="field tempo">Tempo <span><input type="range" name="tempo" min="20" max="240" step="1" value="${DEFAULT_TEMPO}" />
         <output name="tempo-value">${DEFAULT_TEMPO} BPM</output></span></label>
       <label class="field meter">Takt <select name="meter">${METERS.map((m) => `<option value="${m}">${m}</option>`).join('')}</select></label>
@@ -136,37 +155,23 @@ function controlsMarkup(songs: readonly PracticeSong[]): string {
         <button type="button" name="start">Start</button>
       </div>
     </div>
-    <div class="panel song-text">
-      <h2>Liedtext</h2>
-      <textarea name="text" rows="6" spellcheck="false" aria-label="Liedtext"
-        placeholder="Kalimba-Tab hier einfügen, benennen und Importieren drücken"></textarea>
-      <pre class="tab-view" hidden aria-label="Liedtext beim Spielen"></pre>
-      <div class="import-row">
-        <label class="field">Name <input type="text" name="import-name" maxlength="${MAX_NAME_LENGTH}" placeholder="z. B. Sweden" /></label>
-        <label class="field">Tab-Stimmung <select name="import-key">${TAB_TUNINGS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
-        <button type="button" name="import">Importieren</button>
-        <button type="button" name="format-help" class="help-link" aria-haspopup="dialog">Tab-Format ?</button>
-      </div>
-      ${formatHelpMarkup()}
-    </div>
     <div class="status-row">
       <p class="status" role="status"></p>
       <div class="tuning-row">
-        <span class="tuning"></span>
-        <button type="button" name="retune" aria-pressed="false">Umstimmen</button>
-        <button type="button" name="retune-reset">Stimmung zurücksetzen</button>
+        <button type="button" name="edit-text" aria-haspopup="dialog">Liedtext bearbeiten</button>
       </div>
     </div>
+    <pre class="tab-view" aria-label="Liedtext"></pre>
+    ${songEditorMarkup()}
+    ${formatHelpMarkup()}
     <p class="skipped"></p>
     <p class="error" role="alert"></p>`;
 }
 
-/** The format's help as a modal overlay: opened by its button, shut by its ×, Escape or a click beside it. */
-function wireFormatHelp(panel: HTMLElement): void {
-  const help = panel.querySelector<HTMLDialogElement>('dialog.format-help')!;
-  panel.querySelector('[name="format-help"]')!.addEventListener('click', () => help.showModal());
-  help.querySelector('[name="format-help-close"]')!.addEventListener('click', () => help.close());
-  help.addEventListener('click', (e) => e.target === help && help.close()); // the backdrop: a click on the dialog itself, not its content
+/** An overlay shut by its ×, Escape (the browser's) or a click beside it. */
+function wireOverlay(overlay: HTMLDialogElement, closeName: string): void {
+  overlay.querySelector(`[name="${closeName}"]`)!.addEventListener('click', () => overlay.close());
+  overlay.addEventListener('click', (e) => e.target === overlay && overlay.close()); // the backdrop: a click on the dialog itself, not its content
 }
 
 function escapeHtml(text: string): string {
@@ -195,10 +200,10 @@ function describeOption(option: TransposeOption, best: boolean): string {
   return parts.join(' · ');
 }
 
-// a tap in retune mode: natural → sharp → flat → natural
+// a tap on a tongue's end: natural → sharp → flat → natural
 const NEXT_TUNING: Record<number, number> = { 0: 1, 1: -1, [-1]: 0 };
 /** The song text as written, each played part in its own element so it can be highlighted. Keyed by start offset. */
-function renderTabView(view: HTMLElement, text: string, notes: readonly ArrangedNote[]): Map<number, HTMLElement> {
+function renderTabView(view: HTMLElement, text: string, notes: readonly { readonly source: SourceRange }[]): Map<number, HTMLElement> {
   const ranges = [...new Map(notes.map((n) => [n.source.start, n.source])).values()].sort((a, b) => a.start - b.start);
   const marks = new Map<number, HTMLElement>();
   view.replaceChildren();
@@ -261,23 +266,22 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   const clickBox = field<HTMLInputElement>('click');
   const textArea = field<HTMLTextAreaElement>('text');
   const status = panel.querySelector<HTMLElement>('.status')!;
-  const error = panel.querySelector<HTMLElement>('.error')!;
+  const error = panel.querySelector<HTMLElement>('.error:not(.editor-error)')!;
+  const editorError = panel.querySelector<HTMLElement>('.editor-error')!;
+  const editor = panel.querySelector<HTMLDialogElement>('dialog.song-editor')!;
   const skipped = panel.querySelector<HTMLElement>('.skipped')!;
 
   const songs: PracticeSong[] = [...config.songs];
   const nameInput = field<HTMLInputElement>('import-name');
   const keySelect = field<HTMLSelectElement>('import-key');
   const transposeSelect = field<HTMLSelectElement>('transpose');
-  const retuneButton = field<HTMLButtonElement>('retune');
   const tabView = panel.querySelector<HTMLElement>('.tab-view')!;
   let tabMarks = new Map<number, HTMLElement>();
   let highlighted: HTMLElement[] = [];
-  const tuningText = panel.querySelector<HTMLElement>('.tuning')!;
   let session: PracticeSession | undefined;
   let fit = '';
   let halfSteps = config.tongues.map((_, i) => config.tuning?.[i] ?? 0);
   let tongues = retune(config.tongues, halfSteps);
-  let retuning = false;
 
   const kalimba = mountKalimba(
     stage,
@@ -290,32 +294,44 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
         refresh();
       },
     },
-    { onRetune: (tongue) => retuneTongue(tongue.index) },
+    { onRetune: (tongue) => retuneTongue(tongue.index), onResetTuning: () => applyTuning(halfSteps.map(() => 0)) },
   );
   const highway = config.highway(canvas, kalimba);
 
-  // while a song runs the text is shown read-only, so the part being played can be highlighted
-  const showText = (editable: boolean) => {
-    // same height as the box it replaces, so the kalimba doesn't jump
-    if (!editable && !textArea.hidden && textArea.offsetHeight > 0) tabView.style.height = `${textArea.offsetHeight}px`;
-    textArea.hidden = !editable;
-    tabView.hidden = editable;
+  // the strip shows the song as written, from its first notes on; while it runs, the part being played is highlighted
+  const showText = () => {
+    highlighted = [];
+    const notes = notesIn(textArea.value);
+    tabMarks = renderTabView(tabView, textArea.value, notes);
+    showLineOf(tabMarks.get(notes[0]?.source.start ?? -1));
+  };
+
+  const notesIn = (text: string) => {
+    try {
+      return parseSong(text, { tongues }).notes;
+    } catch (e) {
+      if (!(e instanceof SongTextError)) throw e;
+      return [];
+    }
+  };
+
+  // its line on top, the next under it: the strip shows two
+  const showLineOf = (mark: HTMLElement | undefined) => {
+    tabView.scrollTop = mark ? Math.max(0, mark.offsetTop - parseFloat(getComputedStyle(tabView).paddingTop || '0')) : 0;
   };
 
   const highlight = (notes: readonly ArrangedNote[]) => {
     highlighted.forEach((mark) => mark.classList.remove('now'));
     highlighted = notes.map((n) => tabMarks.get(n.source.start)).filter((mark) => mark !== undefined);
     highlighted.forEach((mark) => mark.classList.add('now'));
-    const first = highlighted[0];
-    if (first) tabView.scrollTop = Math.max(0, first.offsetTop - tabView.clientHeight / 2);
+    if (highlighted[0]) showLineOf(highlighted[0]);
   };
 
   const refresh = () => {
     const running = session !== undefined && !session.finished;
     kalimba.setTargets(running ? session!.targets() : []);
     if (session) status.textContent = [fit, describeScore(session)].filter(Boolean).join(' — ');
-    showText(!running);
-    if (running) highlight(session!.currentNotes());
+    highlight(running ? session!.currentNotes() : []);
   };
 
   const setTempo = (bpm: number) => {
@@ -353,6 +369,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
 
   const showSong = () => {
     textArea.value = selectedSong()?.text ?? '';
+    showText();
     setTempo(tempoOf(textArea.value) ?? DEFAULT_TEMPO);
     setMeter(meterOf(textArea.value) ?? DEFAULT_METER);
     offerTranspositions();
@@ -368,6 +385,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
 
   const clearMessages = () => {
     error.textContent = '';
+    editorError.textContent = '';
     skipped.textContent = '';
   };
 
@@ -375,11 +393,11 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     clearMessages();
     const title = nameInput.value.trim();
     if (!title) {
-      error.textContent = 'Gib dem Lied einen Namen, um es zu importieren.';
+      editorError.textContent = 'Gib dem Lied einen Namen, um es zu importieren.';
       return;
     }
     if (songs.some((song) => song.title === title)) {
-      error.textContent = `Ein Lied namens „${title}“ steht schon in der Liste: wähle einen anderen Namen.`;
+      editorError.textContent = `Ein Lied namens „${title}“ steht schon in der Liste: wähle einen anderen Namen.`;
       return;
     }
     // the tuning goes into the text as a key line, so it stays visible and editable
@@ -394,13 +412,15 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
       songSelect.value = String(songs.length - 1);
       nameInput.value = '';
       stop();
+      showText();
       takeHeadersFromText();
       skipped.textContent = describeIgnored(parsed.ignored);
       const ignoredPart = parsed.ignored.length > 0 ? `, ${plural(parsed.ignored.length, 'Teil', 'Teile')} übersprungen` : '';
       status.textContent = `„${title}“ hinzugefügt: ${noteCount(parsed.notes.length)}${ignoredPart}. Start drücken zum Spielen.`;
+      editor.close(); // in the list and chosen: ready to play
     } catch (e) {
       if (!(e instanceof SongTextError)) throw e;
-      error.textContent = e.message;
+      editorError.textContent = e.message;
     }
   };
 
@@ -441,13 +461,14 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     config.songPlayer?.stop();
     session = undefined;
     kalimba.setTargets([]);
-    showText(true);
+    highlight([]);
   };
 
   const beatsPerMinute = () => Number(tempoInput.value);
 
   songSelect.addEventListener('change', showSong);
   textArea.addEventListener('input', () => {
+    showText();
     takeHeadersFromText();
     offerTranspositions();
   });
@@ -459,7 +480,15 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   field<HTMLButtonElement>('start').addEventListener('click', start);
   field<HTMLButtonElement>('stop').addEventListener('click', stop);
   field<HTMLButtonElement>('import').addEventListener('click', importSong);
-  wireFormatHelp(panel);
+  // what plays is what the text says: editing it stops the song
+  field<HTMLButtonElement>('edit-text').addEventListener('click', () => {
+    if (session) stop();
+    editor.showModal();
+  });
+  wireOverlay(editor, 'song-editor-close');
+  const formatHelp = panel.querySelector<HTMLDialogElement>('dialog.format-help')!;
+  field<HTMLButtonElement>('format-help').addEventListener('click', () => formatHelp.showModal());
+  wireOverlay(formatHelp, 'format-help-close');
   // a song fitted to the old tuning no longer fits: stop it and offer new transpositions
   const applyTuning = (next: number[]) => {
     halfSteps = next;
@@ -467,7 +496,6 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     kalimba.setTongues(tongues);
     stop();
     offerTranspositions();
-    tuningText.textContent = tuningLine();
     config.onTuningChange?.(halfSteps);
   };
 
@@ -476,21 +504,9 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
     kalimba.pluck(tongues[index]); // hear the new pitch, like checking a tongue with a tuner
   };
 
-  const tuningLine = () => (retuning ? `${describeTuning(tongues)} · Zunge antippen: natürlich → # → b` : describeTuning(tongues));
-
-  const toggleRetuning = () => {
-    retuning = !retuning;
-    retuneButton.setAttribute('aria-pressed', String(retuning));
-    kalimba.setRetuning(retuning);
-    tuningText.textContent = tuningLine();
-  };
-
   nameInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') importSong();
   });
-  retuneButton.addEventListener('click', toggleRetuning);
-  field<HTMLButtonElement>('retune-reset').addEventListener('click', () => applyTuning(halfSteps.map(() => 0)));
-  tuningText.textContent = tuningLine();
   showSong();
 
   return {
