@@ -147,9 +147,31 @@ button { font: inherit; cursor: pointer; }
 .import-row { display: flex; flex-wrap: wrap; gap: 12px 14px; align-items: flex-end; }
 .import-row .field { flex: 1 1 220px; }
 .import-row button { height: 40px; padding: 0 20px; color: var(--text); background: transparent; border: 1px solid var(--accent-soft); border-radius: 8px; font-weight: 600; }
-.help { flex-basis: 100%; font-size: 0.85rem; color: var(--muted); }
-.help summary { cursor: pointer; color: var(--accent-soft); width: max-content; }
-.help p { margin: 6px 0 0; }
+.import-row .help-link { margin-left: auto; padding: 0 4px; border: none; color: var(--accent-soft); font-weight: 400; text-decoration: underline; text-underline-offset: 3px; }
+
+/* the tab format's help: an overlay of short sections, an example as written beside what it means */
+.format-help {
+  width: min(760px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: auto;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
+}
+.format-help::backdrop { background: rgb(6 12 8 / 0.7); backdrop-filter: blur(2px); }
+.format-help header { max-width: none; margin: 0; position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.format-help h2 { margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text); letter-spacing: 0; text-transform: none; } /* not the panel's small caps: it sits in the song panel */
+.format-help header button { width: 36px; height: 36px; padding: 0; font-size: 1.4rem; line-height: 1; }
+.format-help > p { margin: 14px 20px; color: var(--muted); font-size: 0.9rem; }
+.format-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 18px 28px; padding: 0 20px; }
+.format-help h3 { margin: 0 0 8px; font-size: 0.75rem; font-weight: 600; color: var(--accent-soft); letter-spacing: 0.06em; text-transform: uppercase; }
+.format-help dl { display: grid; grid-template-columns: 7rem 1fr; gap: 6px 14px; margin: 0; align-items: baseline; } /* one width in every section: the meanings line up */
+.format-help dt code { display: inline-block; padding: 2px 8px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.875rem; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: 6px; white-space: pre; }
+.format-help dd { margin: 0; font-size: 0.9rem; line-height: 1.4; }
 
 /* what's going on, and the tuning, on one line under the panels */
 .status-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 0 4px; }

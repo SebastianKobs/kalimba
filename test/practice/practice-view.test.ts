@@ -182,6 +182,27 @@ describe('mountPractice', () => {
     expect(targets()).toEqual([]);
   });
 
+  describe('the tab format’s help', () => {
+    it('is an overlay of its own, opened by a button by the import, shut by its close button', () => {
+      const { q } = setup();
+      const help = q<HTMLDialogElement>('dialog.format-help');
+      expect(q('.import-row [name="format-help"]').textContent).toContain('Tab-Format');
+      expect(q('details.help')).toBeNull(); // no longer folded into the panel
+      expect(help.querySelector('[name="format-help-close"]')).not.toBeNull();
+    });
+
+    it('is short sections of examples with their meaning, not a wall of text', () => {
+      const { q } = setup();
+      const help = q('dialog.format-help');
+      const headings = [...help.querySelectorAll('h3')].map((h) => h.textContent);
+      expect(headings).toEqual(['Noten', 'Oktaven', 'Zusammen', 'Rhythmus', 'Kopfzeilen']);
+      const examples = [...help.querySelectorAll('dt code')].map((c) => c.textContent);
+      expect(examples).toEqual(expect.arrayContaining(['1 … 7', "1'", '(1 3 5)', '2-', 'tempo: 90', 'key: G']));
+      // every line of it short enough to read at a glance
+      [...help.querySelectorAll('dd, p')].forEach((line) => expect(line.textContent!.length).toBeLessThanOrEqual(90));
+    });
+  });
+
   describe('meter and click', () => {
     const meter = (q: ReturnType<typeof setup>['q']) => q<HTMLSelectElement>('[name="meter"]').value;
 

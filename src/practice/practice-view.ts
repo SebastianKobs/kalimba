@@ -57,12 +57,50 @@ const MODES: readonly [PracticeMode, string][] = [
   ['wait', 'Warten: Schritt für Schritt'],
 ];
 
-const FORMAT_HELP =
-  'Einen Kalimba-Tab einfügen oder selbst schreiben. Noten: Kalimba-Zahlen wie auf den Zungen (1 = C4 … 7 = B4) oder Buchstaben (C, F#, Bb, oder C5 mit Oktave; B ist hier das deutsche H). ' +
-  "Eine Oktave höher: ' ′ * ° oder ein Punkt darüber, doppelt (oder ″ \") für zwei; eine Oktave tiefer: , oder ein Punkt darunter. " +
-  'Zusammen gespielt: ( ) oder [ ], z. B. (1 3 5), (135), (5-7), [C E G]. Ein - nach einer Note hält sie einen Schlag länger: 2-4 ist 2 für zwei Schläge, dann 4. ' +
-  'Rhythmus: ein Schlag pro Note im Tempo des Reglers; _ halbiert, . verlängert um die Hälfte, 0 ist eine Pause. ' +
-  'Kopfzeilen: "title: …", "tempo: 90" (stellt den Regler), "meter: 3/4" (stellt den Takt, sonst 4/4) und "key: G" (jedes F wird F#, wie bei einer Kalimba mit erhöhter F-Zunge; auch D, F, Bb, Em …). Alles andere, etwa Liedtext, Links oder Überschriften, wird übersprungen und aufgelistet.';
+// the tab format, a section each: an example as written, and what it means
+const FORMAT_HELP: readonly { title: string; lines: readonly [string, string][] }[] = [
+  { title: 'Noten', lines: [
+    ['1 … 7', 'Kalimba-Zahlen wie auf den Zungen: 1 = C4 … 7 = B4'],
+    ['C  F#  Bb', 'Buchstaben, mit Oktave wie C5; B ist das deutsche H'],
+  ] },
+  { title: 'Oktaven', lines: [
+    ["1'", 'eine höher, auch ′ * ° oder ein Punkt darüber'],
+    ["1''", 'zwei höher, auch ″ oder "'],
+    ['1,', 'eine tiefer, auch ein Punkt darunter'],
+  ] },
+  { title: 'Zusammen', lines: [
+    ['(1 3 5)', 'zusammen gespielt, auch (135) oder [C E G]'],
+  ] },
+  { title: 'Rhythmus', lines: [
+    ['1', 'ein Schlag, im Tempo des Reglers'],
+    ['2-', 'einen Schlag länger: 2-4 ist 2 für zwei Schläge, dann 4'],
+    ['1_', 'ein halber Schlag'],
+    ['1.', 'anderthalb Schläge'],
+    ['0', 'eine Pause'],
+  ] },
+  { title: 'Kopfzeilen', lines: [
+    ['title: …', 'der Name des Lieds'],
+    ['tempo: 90', 'stellt den Tempo-Regler'],
+    ['meter: 3/4', 'stellt den Takt, sonst 4/4'],
+    ['key: G', 'jedes F wird F#, wie mit erhöhter F-Zunge; auch D, F, Bb, Em …'],
+  ] },
+];
+
+function formatHelpMarkup(): string {
+  const sections = FORMAT_HELP.map(({ title, lines }) => {
+    const rows = lines.map(([example, meaning]) => `<dt><code>${escapeHtml(example)}</code></dt><dd>${escapeHtml(meaning)}</dd>`).join('');
+    return `<section><h3>${title}</h3><dl>${rows}</dl></section>`;
+  }).join('');
+  return `<dialog class="format-help" aria-labelledby="format-help-title">
+      <header>
+        <h2 id="format-help-title">Tab-Format</h2>
+        <button type="button" name="format-help-close" aria-label="Schließen">×</button>
+      </header>
+      <p>Einen Kalimba-Tab einfügen oder selbst schreiben.</p>
+      <div class="format-sections">${sections}</div>
+      <p>Alles andere, etwa Liedtext, Links oder Überschriften, wird übersprungen und aufgelistet.</p>
+    </dialog>`;
+}
 
 const MAX_NAME_LENGTH = 80;
 const METERS = ['2/4', '3/4', '4/4', '5/4', '6/8', '12/8'];
@@ -107,8 +145,9 @@ function controlsMarkup(songs: readonly PracticeSong[]): string {
         <label class="field">Name <input type="text" name="import-name" maxlength="${MAX_NAME_LENGTH}" placeholder="z. B. Sweden" /></label>
         <label class="field">Tab-Stimmung <select name="import-key">${TAB_TUNINGS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label>
         <button type="button" name="import">Importieren</button>
-        <details class="help"><summary>Tab-Format</summary><p>${FORMAT_HELP}</p></details>
+        <button type="button" name="format-help" class="help-link" aria-haspopup="dialog">Tab-Format ?</button>
       </div>
+      ${formatHelpMarkup()}
     </div>
     <div class="status-row">
       <p class="status" role="status"></p>
@@ -120,6 +159,14 @@ function controlsMarkup(songs: readonly PracticeSong[]): string {
     </div>
     <p class="skipped"></p>
     <p class="error" role="alert"></p>`;
+}
+
+/** The format's help as a modal overlay: opened by its button, shut by its ×, Escape or a click beside it. */
+function wireFormatHelp(panel: HTMLElement): void {
+  const help = panel.querySelector<HTMLDialogElement>('dialog.format-help')!;
+  panel.querySelector('[name="format-help"]')!.addEventListener('click', () => help.showModal());
+  help.querySelector('[name="format-help-close"]')!.addEventListener('click', () => help.close());
+  help.addEventListener('click', (e) => e.target === help && help.close()); // the backdrop: a click on the dialog itself, not its content
 }
 
 function escapeHtml(text: string): string {
@@ -412,6 +459,7 @@ export function mountPractice(root: HTMLElement, config: PracticeConfig): Practi
   field<HTMLButtonElement>('start').addEventListener('click', start);
   field<HTMLButtonElement>('stop').addEventListener('click', stop);
   field<HTMLButtonElement>('import').addEventListener('click', importSong);
+  wireFormatHelp(panel);
   // a song fitted to the old tuning no longer fits: stop it and offer new transpositions
   const applyTuning = (next: number[]) => {
     halfSteps = next;
